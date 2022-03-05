@@ -1,0 +1,21 @@
+training:
+  qd_pairs_path: "resources/datasets/home_depot/training/qd_pairs"
+  documents_path: "resources/datasets/home_depot/training/documents"
+
+features:
+  query:
+    - name: "search_term"
+      type: "text1"
+  document:
+    - name: "product_title"
+      type: "text1"
+  types:
+    - name: "text1"
+      type: "text"
+      embedding_dim: 100
+      num_embeddings: 1000
+      max_length: 10
+      share_weights: true
+
+
+

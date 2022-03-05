@@ -7,3 +7,4 @@ flake8
 pytest==6.2.4
 tox==3.24.5
 mypy==0.931
+omegaconf==2.0.6

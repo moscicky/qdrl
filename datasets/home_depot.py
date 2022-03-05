@@ -1,5 +1,4 @@
 from pyspark.sql import SparkSession
-from datasets.transform import transform_training_dataset, transform_documents_set
 from datasets.helpers import clean_phrase_udf
 
 from pyspark.sql import functions as F
@@ -9,21 +8,22 @@ def create_training_dataset(spark: SparkSession, raw_dataset_path: str, output_d
     df = spark.read.csv(f"{raw_dataset_path}/train.csv", header=True)
     df = (
         df.drop("id")
-            .withColumn("product_title", clean_phrase_udf(F.col("product_title")))
-            .withColumn("search_term", clean_phrase_udf(F.col("search_term")))
+            .withColumn("document_product_title", clean_phrase_udf(F.col("product_title")))
+            .withColumn("query_search_term", clean_phrase_udf(F.col("search_term")))
+            .withColumnRenamed("product_uid", "document_id")
     )
 
     df.cache()
 
-    documents_ds = transform_documents_set(df.dropDuplicates(subset=["product_uid"]), document_cols=["product_title"],
-                                           doc_id_col="product_uid")
+    documents_ds = df.dropDuplicates(subset=["document_id"]).select(F.col("document_id"),
+                                                                    F.col("document_product_title"))
 
-    relevant_pairs = df.filter(F.col("relevance") > 2.0)
+    relevant_pairs = df.filter(F.col("relevance") > 2.0).select(F.col("document_id"),
+                                                                    F.col("document_product_title"),
+                                                                    F.col("query_search_term"))
 
-    training_ds = transform_training_dataset(relevant_pairs, query_cols=["search_term"],
-                                             document_cols=["product_title"], doc_id_col="product_uid")
-    training_ds.repartition(1).write.json(f"{output_dir}/training/qd_pairs", mode="overwrite")
-    documents_ds.repartition(1).write.json(f"{output_dir}/training/documents", mode="overwrite")
+    relevant_pairs.repartition(1).write.csv(f"{output_dir}/training/qd_pairs", mode="overwrite", header=True)
+    documents_ds.repartition(1).write.csv(f"{output_dir}/training/documents", mode="overwrite", header=True)
 
 
 def create_evaluation_dataset(spark: SparkSession, raw_dataset_path: str, output_dir: str):
@@ -31,26 +31,28 @@ def create_evaluation_dataset(spark: SparkSession, raw_dataset_path: str, output
     test = spark.read.csv(f"{raw_dataset_path}/test.csv", header=True).limit(10000)
 
     df = test.join(solution, on="id", how="inner")
-    df.show()
     df = (
         df.drop("id")
-            .withColumn("product_title", clean_phrase_udf(F.col("product_title")))
-            .withColumn("search_term", clean_phrase_udf(F.col("search_term")))
+            .withColumn("document_product_title", clean_phrase_udf(F.col("product_title")))
+            .withColumn("query_search_term", clean_phrase_udf(F.col("search_term")))
+            .withColumnRenamed("product_uid", "document_id")
     )
 
     df.cache()
 
-    documents_ds = transform_documents_set(df.dropDuplicates(subset=["product_uid"]), document_cols=["product_title"],
-                                           doc_id_col="product_uid")
+    documents_ds = df.dropDuplicates(subset=["document_id"]).select(F.col("document_id"),
+                                                                    F.col("document_product_title"))
 
     queries = (
         df.filter(F.col("relevance") > 2.0)
-            .groupBy("search_term")
-            .agg(F.collect_set("product_uid").alias("documents"))
+            .groupBy("query_search_term")
+            .agg(F.collect_set("document_id").alias("document_ids"))
+            .withColumn("document_ids", F.col("document_ids").cast("string"))
+
     )
 
-    documents_ds.repartition(1).write.json(f"{output_dir}/evaluation/documents", mode="overwrite")
-    queries.repartition(1).write.json(f"{output_dir}/evaluation/queries", mode="overwrite")
+    documents_ds.repartition(1).write.csv(f"{output_dir}/evaluation/documents", mode="overwrite", header=True)
+    queries.repartition(1).write.csv(f"{output_dir}/evaluation/queries", mode="overwrite", header=True)
 
 
 def create_spark_context() -> SparkSession:
