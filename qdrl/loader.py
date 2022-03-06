@@ -12,6 +12,7 @@ class QueryDocumentDataset(IterableDataset):
     def __init__(self, config: TrainingConfig):
         self.config: TrainingConfig = config
         self.df = self.load_from_file(config.dataset_location.qd_pairs_path)
+        print(self.df.head())
 
     def __iter__(self) -> Iterator[T_co]:
         pass
@@ -23,8 +24,9 @@ class QueryDocumentDataset(IterableDataset):
         with open(path, "rb") as f:
             df = pd.read_csv(f)
             for feature in self.config.features:
-                if isinstance(feature.type, TextFeature):
+                if feature.type.type == "text":
+                    print("true!")
                     df[feature.name] = df[feature.name].map(
-                        lambda k: vectorize(k, num_features=feature.type.embeddings_dim,
-                                            max_size=feature.type.max_size))
-            return df
+                        lambda k: vectorize(k, num_features=feature.type.embedding_dim,
+                                            max_length=feature.type.max_length))
+            return df[self.config.query_features + self.config.document_features]

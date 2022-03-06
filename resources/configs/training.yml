@@ -1,5 +1,5 @@
 training:
-  qd_pairs_path: "resources/datasets/home_depot/training/qd_pairs"
+  qd_pairs_path: "resources/datasets/home_depot/training/qd_pairs/part-00000-f9ce8d8b-d1be-40a1-a4be-f26ca475d234-c000.csv"
   documents_path: "resources/datasets/home_depot/training/documents"
 
 features:
