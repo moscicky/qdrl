@@ -1,6 +1,7 @@
 import json
 from typing import Iterator, List, Dict, NamedTuple, Any
 
+import numpy as np
 import pandas as pd
 from torch.utils.data import IterableDataset, DataLoader
 from torch.utils.data.dataset import T_co
@@ -15,7 +16,8 @@ class QueryDocumentDataset(IterableDataset):
         print(self.df.head())
 
     def __iter__(self) -> Iterator[T_co]:
-        pass
+        for i, row in self.df.iterrows():
+            yield np.array(row[self.config.query_features[0]]), np.array(row[self.config.document_features[0]])
 
     def __getitem__(self, index) -> T_co:
         pass
@@ -25,7 +27,6 @@ class QueryDocumentDataset(IterableDataset):
             df = pd.read_csv(f)
             for feature in self.config.features:
                 if feature.type.type == "text":
-                    print("true!")
                     df[feature.name] = df[feature.name].map(
                         lambda k: vectorize(k, num_features=feature.type.embedding_dim,
                                             max_length=feature.type.max_length))
