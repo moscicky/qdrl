@@ -13,7 +13,6 @@ class QueryDocumentDataset(IterableDataset):
     def __init__(self, config: TrainingConfig):
         self.config: TrainingConfig = config
         self.df = self.load_from_file(config.dataset_location.qd_pairs_path)
-        print(self.df.head())
 
     def __iter__(self) -> Iterator[T_co]:
         for i, row in self.df.iterrows():
