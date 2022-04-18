@@ -7,7 +7,6 @@ install_requirements = [
     "pyspark==2.4.8",
     "pyspark-stubs==2.4.0",
     "pandas==1.0.5",
-    "omegaconf==2.0.6"
 ]
 
 test_requirements = [

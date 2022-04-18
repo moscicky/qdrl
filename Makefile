@@ -20,6 +20,8 @@ clean-pyc:
 clean-test:
 	rm -rf .pytest_cache
 
+mypy: ## run mypy checks
+	mypy --junit-xml test-reports/junit-mypy.xml .
 
 clean: clean-build
 
