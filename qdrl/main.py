@@ -18,6 +18,10 @@ def train(
         epoch_loss = 0.0
         for batch_idx, batch in enumerate(dataloader):
             anchor, positive, negative = batch
+
+            # if batch_idx == 0:
+            #     print(anchor, positive, negative)
+
             anchor_out = model(anchor)
             positive_out = model(positive)
             negative_out = model(negative)
@@ -27,7 +31,6 @@ def train(
             loss.backward()
             optimizer.step()
             epoch_loss += loss.item()
-
         print(f"Epoch: {epoch}, loss: {epoch_loss}")
 
 
@@ -50,8 +53,8 @@ EMBEDDING_DIM = 10
 
 if __name__ == '__main__':
 
-    dataset = TripletsDataset()
-    dataloader = DataLoader(dataset, batch_size=4, num_workers=0)
+    dataset = TripletsDataset('resources/small.csv', num_features=EMBEDDING_DIM)
+    dataloader = DataLoader(dataset, batch_size=64, num_workers=0)
 
     model = NeuralNet(num_embeddings=100, embedding_dim=EMBEDDING_DIM)
 
