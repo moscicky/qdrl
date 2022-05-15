@@ -13,6 +13,7 @@ def train(
         loss_fn: nn.TripletMarginWithDistanceLoss,
         optimizer: optim.Optimizer,
         n_epochs: int):
+
     model.train()
     for epoch in range(n_epochs):
         epoch_loss = 0.0
@@ -54,7 +55,7 @@ NUM_EMBEDDINGS = 10000
 
 if __name__ == '__main__':
 
-    dataset = TripletsDataset('resources/dataset.csv', num_features=NUM_EMBEDDINGS)
+    dataset = TripletsDataset('datasets/small.csv', num_features=NUM_EMBEDDINGS)
     dataloader = DataLoader(dataset, batch_size=64, num_workers=0, shuffle=True)
 
     model = NeuralNet(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM)
@@ -67,3 +68,5 @@ if __name__ == '__main__':
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     train(dataloader, model, triplet_loss, optimizer, n_epochs)
+
+    torch.save(model.state_dict(), "models/model_weights.pth")
