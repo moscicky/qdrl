@@ -4,67 +4,131 @@ from typing import Dict, List
 import numpy as np
 import faiss
 import torch
+from torch import nn
 
+from qdrl.configs import SimilarityMetric, WordVectorizerConfig, ModelConfig, Item, Query, QueryEmbedded, EmbeddedItem
 from qdrl.main_train import NeuralNet
 from qdrl.preprocess import vectorize_word
 
-if __name__ == '__main__':
-    dim = 64
-    index = faiss.IndexFlatL2(dim)
-    candidates: Dict[int, Dict] = {}
-    candidates_by_product_id: Dict[str, int] = {}
-    counter = 0
-    num_embeddings = 10000
 
-    queries: List[Dict] = []
+def create_faiss_index(
+        dim: int,
+        vectors: np.ndarray,
+        similarity_metric: SimilarityMetric):
+    index = faiss.IndexFlat(dim, faiss.METRIC_INNER_PRODUCT)
+    if similarity_metric == SimilarityMetric.COSINE:
+        faiss.normalize_L2(vectors)
+    index.add(vectors)
+    return index
 
-    model = NeuralNet(num_embeddings=num_embeddings, embedding_dim=dim)
-    model.load_state_dict(torch.load('models/model_weights.pth'))
+
+def embedd_word(text: str,
+                vectorizer: WordVectorizerConfig,
+                model: nn.Module) -> np.ndarray:
+    text_vectorized = vectorize_word(text, num_features=vectorizer.num_features, max_length=vectorizer.max_length)
+    text_t = torch.tensor([text_vectorized])
+    text_embedded = model(text_t).detach().numpy()
+    return text_embedded
+
+
+def prepare_model(
+        model_config: ModelConfig,
+        model_path: str
+) -> nn.Module:
+    model = NeuralNet(num_embeddings=model_config.num_embeddings, embedding_dim=model_config.embedding_dim)
+    model.load_state_dict(torch.load(model_path))
     model.eval()
+    return model
 
-    with open('datasets/valid_candidates.json') as file:
-        for line in file:
-            if counter % 50000 == 0:
-                print(f"{counter} products embedded")
-            candidate = json.loads(line)
-            product_name = vectorize_word(candidate["product_name"], num_embeddings, 10)
-            product_name_t = torch.tensor([product_name])
-            product_embedded = model(product_name_t).detach().numpy()[:1, :]
-            candidates[counter] = {
-                "id": candidate["product_id"],
-                "name": candidate["product_name"],
-                "embedding": product_embedded
-            }
-            candidates_by_product_id[candidate["product_id"]] = counter
-            index.add(product_embedded)
-            counter += 1
 
-    with open('datasets/valid_queries.json') as file:
-        for line in file:
-            query = json.loads(line)
-            query_vectorized = vectorize_word(query["query_search_phrase"], num_embeddings, 10)
-            query_t = torch.tensor([query_vectorized])
-            query_embedded = model(product_name_t).detach().numpy()[:1, :]
-            q = {
-                "search_phrase": query["query_search_phrase"],
-                "relevant_product_ids": [candidates_by_product_id[i] for i in query["relevant_product_ids"]],
-                "embedding": query_embedded
-            }
-            queries.append(q)
+def load_items_pool(candidates_path: str) -> Dict[int, Item]:
+    idx = 0
+    items = {}
+    with open(candidates_path) as f:
+        for line in f:
+            item = json.loads(line)
+            items[idx] = Item(business_id=item["product_id"], text=item["product_name"])
+            idx += 1
+    return items
 
-    k = 1024
+
+def load_queries(queries_path: str) -> List[Query]:
+    queries = []
+    with open(queries_path) as f:
+        for line in f:
+            query_parsed = json.loads(line)
+            query = Query(text=query_parsed["query_search_phrase"], relevant_business_item_ids=query_parsed["relevant_product_ids"])
+            queries.append(query)
+    return queries
+
+
+def execute_query(query_embedding: np.ndarray, similarity_metric: SimilarityMetric, index, k: int) -> List[int]:
+    if similarity_metric == similarity_metric.COSINE:
+        faiss.normalize_L2(query_embedding)
+    distances, ids = index.search(query_embedding, k)
+    return ids[0, :].tolist()
+
+
+def validation(
+        model_config: ModelConfig,
+        model_path: str,
+        candidates_path: str,
+        queries_path: str,
+        vectorizer_config: WordVectorizerConfig,
+        similarity_metric: SimilarityMetric,
+        k: int
+):
+    model = prepare_model(model_config, model_path)
+    items = load_items_pool(candidates_path)
+    item_embeddings = {}
+    aux_ids_by_product_id = {}
+    for aux_id, item in items.items():
+        if aux_id % 50000 == 0:
+            print(f"{aux_id} items embedded")
+        item_embedding = embedd_word(item.text, vectorizer_config, model)
+        item_embeddings[aux_id] = EmbeddedItem(
+            business_id=item.business_id,
+            text=item.text,
+            embedding=item_embedding
+        )
+        aux_ids_by_product_id[item.business_id] = aux_id
+    all_item_embeddings = np.array([e.embedding[0] for e in item_embeddings.values()])
+    index = create_faiss_index(
+        dim=model_config.embedding_dim,
+        vectors=all_item_embeddings,
+        similarity_metric=similarity_metric
+    )
+
+    query_embeddings = []
+    queries = load_queries(queries_path)
+    for query in queries:
+        query_embedded = embedd_word(query.text, vectorizer_config, model)
+        query_embeddings.append(QueryEmbedded(
+            text=query.text,
+            relevant_aux_ids=[aux_ids_by_product_id[id] for id in query.relevant_business_item_ids],
+            embedding=query_embedded
+        ))
 
     recalls = []
-    for idx, query in enumerate(queries):
+    for idx, q in enumerate(query_embeddings):
         if idx % 1000 == 0:
-            print(f"{idx} queries done")
-        D, I = index.search(query["embedding"], k)
-        neighs = I[0, :].tolist()
-        relevant_product_ids = query["relevant_product_ids"]
-        intersection = set(relevant_product_ids).intersection(set(neighs))
-        found_cnt = len(intersection)
-        recall = found_cnt / k
+            print(f"{idx} queries executed")
+        query_result = execute_query(q.embedding, similarity_metric, index, k)
+        intersection = set(query_result).intersection(set(q.relevant_aux_ids))
+        num_found = len(intersection)
+        recall = num_found / k
         recalls.append(recall)
-
     print(np.mean(np.array(recalls)))
     print("Done!")
+
+
+if __name__ == '__main__':
+    validation(
+        model_config=ModelConfig(num_embeddings=50000, embedding_dim=128),
+        model_path='models/model_weights.pth',
+        candidates_path='datasets/valid_candidates.json',
+        queries_path='datasets/valid_queries.json',
+        vectorizer_config=WordVectorizerConfig(max_length=10, num_features=50000),
+        similarity_metric=SimilarityMetric.COSINE,
+        k=1024
+    )

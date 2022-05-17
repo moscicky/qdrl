@@ -20,9 +20,6 @@ def train(
         for batch_idx, batch in enumerate(dataloader):
             anchor, positive, negative = batch
 
-            # if batch_idx == 0:
-            #     print(anchor, positive, negative)
-
             anchor_out = model(anchor)
             positive_out = model(positive)
             negative_out = model(negative)
@@ -50,17 +47,17 @@ class NeuralNet(nn.Module):
         return self.embedding_layer(text)
 
 
-EMBEDDING_DIM = 64
-NUM_EMBEDDINGS = 10000
+EMBEDDING_DIM = 128
+NUM_EMBEDDINGS = 50000
 
 if __name__ == '__main__':
 
     dataset = TripletsDataset('datasets/small.csv', num_features=NUM_EMBEDDINGS)
-    dataloader = DataLoader(dataset, batch_size=64, num_workers=0, shuffle=True)
+    dataloader = DataLoader(dataset, batch_size=128, num_workers=0, shuffle=True)
 
     model = NeuralNet(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM)
 
-    n_epochs = 10
+    n_epochs = 20
 
     triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y))
 
