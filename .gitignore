@@ -5,3 +5,5 @@
 test-reports
 
 datasets/*
+checkpoints/*
+models/*
