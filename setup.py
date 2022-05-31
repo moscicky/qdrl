@@ -2,10 +2,8 @@ from setuptools import find_packages, setup
 
 
 install_requirements = [
-    "torch==1.9.0"
+    "torch==1.11.0",
     "numpy==1.21.2",
-    "pyspark==2.4.8",
-    "pyspark-stubs==2.4.0",
     "pandas==1.0.5",
 ]
 

@@ -1,10 +1,12 @@
+import os.path
+
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
 from torch import optim
 import torch.nn.functional as F
 
-from loader import TripletsDataset
+from qdrl.loader import TripletsDataset
 
 
 def train(
@@ -52,12 +54,18 @@ NUM_EMBEDDINGS = 50000
 
 if __name__ == '__main__':
 
+    model_output_path = "models/model_weights.pth"
+
     dataset = TripletsDataset('datasets/small.csv', num_features=NUM_EMBEDDINGS)
     dataloader = DataLoader(dataset, batch_size=128, num_workers=0, shuffle=True)
 
     model = NeuralNet(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM)
 
-    n_epochs = 20
+    if os.path.exists(os.path.join(os.getcwd(), model_output_path)):
+        print('Found previous model, resuming training')
+        model.load_state_dict(torch.load(model_output_path))
+
+    n_epochs = 10
 
     triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y))
 
@@ -66,4 +74,4 @@ if __name__ == '__main__':
 
     train(dataloader, model, triplet_loss, optimizer, n_epochs)
 
-    torch.save(model.state_dict(), "models/model_weights.pth")
+    torch.save(model.state_dict(), model_output_path)
