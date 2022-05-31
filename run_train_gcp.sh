@@ -44,7 +44,7 @@ gcloud ai custom-jobs create \
   --region=${REGION} \
   --display-name=${DISPLAY_NAME} \
   --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},container-image-uri=${CONTAINER_IMAGE_URI} \
-  --args=num-epochs=${NUM_EPOCHS},job-dir=${JOB_DIR},training-data-dir=${TRAINING_DATA_DIR},training-data-file=${TRAINING_DATA_FILE}
+  --args=--num-epochs=${NUM_EPOCHS},--job-dir=${JOB_DIR},--training-data-dir=${TRAINING_DATA_DIR},--training-data-file=${TRAINING_DATA_FILE}
   #  --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},executor-image-uri=${EXECUTOR_IMAGE_URI},local-package-path=${WORKING_DIRECTORY},python-module=${PYTHON_MODULE} \
 
 #  --reuse-job-dir \
