@@ -1,11 +1,11 @@
 import argparse
 import os.path
-from argparse import ArgumentParser
 from typing import Optional
 
 import torch
 from torch import nn
 from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from torch import optim
 import torch.nn.functional as F
 
@@ -19,7 +19,8 @@ def train(
         loss_fn: nn.TripletMarginWithDistanceLoss,
         optimizer: optim.Optimizer,
         n_epochs: int,
-        checkpoints_path: str):
+        checkpoints_path: str,
+        tensorboard_writer: SummaryWriter):
     model.train()
     for epoch in range(epoch_start, n_epochs):
         epoch_loss = 0.0
@@ -38,7 +39,7 @@ def train(
             epoch_loss += loss.item()
 
         save_checkpoint(epoch, checkpoints_path, model, optimizer)
-
+        tensorboard_writer.add_scalar("Loss/train", epoch_loss, epoch)
         print(f"Finished epoch: {epoch}, loss: {epoch_loss}")
 
 
@@ -126,6 +127,7 @@ def main(
         training_data_dir: str,
         training_data_file: Optional[str]
 ):
+    tensorboard_logdir_path = os.path.join(job_dir, "tensorboard")
     model_output_path = os.path.join(job_dir, "models", "model_weights.pth")
     checkpoints_path = os.path.join(job_dir, "checkpoints", "checkpoint")
     if training_data_file:
@@ -152,6 +154,8 @@ def main(
         if reuse_epoch:
             epoch_start = checkpoint['epoch']
 
+    tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
+
     train(
         epoch_start=epoch_start,
         dataloader=dataloader,
@@ -159,8 +163,12 @@ def main(
         loss_fn=triplet_loss,
         optimizer=optimizer,
         n_epochs=num_epochs,
-        checkpoints_path=checkpoints_path)
+        checkpoints_path=checkpoints_path,
+        tensorboard_writer=tensorboard_writer
+    )
 
+    tensorboard_writer.flush()
+    tensorboard_writer.close()
     torch.save(model.state_dict(), model_output_path)
 
 
@@ -171,7 +179,7 @@ if __name__ == '__main__':
         main(
             num_epochs=10,
             job_dir='.',
-            reuse_job_dir=True,
+            reuse_job_dir=False,
             training_data_dir='datasets',
             training_data_file='small.csv',
             learning_rate=1e-3,

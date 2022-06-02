@@ -3,7 +3,7 @@ REGION="europe-west3"
 DISPLAY_NAME="ebr_$(date +'%Y-%m-%dT%H-%M-%S')"
 PYTHON_MODULE="qdrl.main_train"
 WORKING_DIRECTORY="."
-MACHINE_TYPE="e2-standard-4"
+MACHINE_TYPE="e2-highmem-4"
 REPLICA_COUNT=1
 NUM_EPOCHS=10
 

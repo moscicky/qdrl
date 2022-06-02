@@ -5,6 +5,8 @@ install_requirements = [
     "torch==1.11.0",
     "numpy==1.21.2",
     "pandas==1.0.5",
+    "tensorboard==2.9.0",
+    "protobuf==3.20.1"
 ]
 
 test_requirements = [
