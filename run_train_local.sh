@@ -26,5 +26,4 @@ gcloud ai custom-jobs local-run \
   --job-dir=$WORKING_DIRECTORY \
   --training-data-dir=datasets \
   --training-data-file=small.csv \
-  --reuse-job-dir \
-#  --reuse-epoch
+  --reuse-epoch

@@ -1,6 +1,6 @@
 import argparse
 import os.path
-from typing import Optional
+from typing import Optional, List
 
 import torch
 from torch import nn
@@ -86,12 +86,6 @@ def get_args():
     )
 
     args_parser.add_argument(
-        '--reuse-job-dir',
-        action='store_true',
-        default=False,
-    )
-
-    args_parser.add_argument(
         '--training-data-dir',
         type=str,
         required=True,
@@ -118,18 +112,28 @@ def get_args():
     return args_parser.parse_args()
 
 
+def init_directories(paths: List[str]):
+    for path in paths:
+        os.makedirs(path, exist_ok=True)
+
+
 def main(
         num_epochs: int,
         learning_rate: float,
         job_dir: str,
-        reuse_job_dir: bool,
         reuse_epoch: bool,
         training_data_dir: str,
         training_data_file: Optional[str]
 ):
+    if not os.path.isdir(job_dir):
+        init_directories([job_dir])
+
     tensorboard_logdir_path = os.path.join(job_dir, "tensorboard")
-    model_output_path = os.path.join(job_dir, "models", "model_weights.pth")
-    checkpoints_path = os.path.join(job_dir, "checkpoints", "checkpoint")
+    checkpoint_dir_path = os.path.join(job_dir, "checkpoints")
+    model_output_dir_path = os.path.join(job_dir, "models")
+    model_output_path = os.path.join(model_output_dir_path, "model_weights.pth")
+    checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
+
     if training_data_file:
         dataset_path = os.path.join(training_data_dir, training_data_file)
     else:
@@ -138,6 +142,8 @@ def main(
     dataset = TripletsDataset(dataset_path, num_features=NUM_EMBEDDINGS)
     dataloader = DataLoader(dataset, batch_size=128, num_workers=0, shuffle=True)
 
+    tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
+
     model = NeuralNet(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
@@ -145,16 +151,18 @@ def main(
 
     epoch_start = 0
 
-    if reuse_job_dir:
-        print('Trying to resume training from checkpoint...')
+    if os.path.exists(checkpoints_path):
+        print("Checkpoint found, trying to resume training...")
         checkpoint = torch.load(checkpoints_path)
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if reuse_epoch:
             epoch_start = checkpoint['epoch']
-
-    tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
+        print(f"Model loaded, will resume from epoch: {epoch_start}...")
+    else:
+        print("Checkpoint not found, will create training directories from scratch...")
+        init_directories([tensorboard_logdir_path, model_output_dir_path, checkpoint_dir_path])
 
     train(
         epoch_start=epoch_start,
@@ -178,12 +186,11 @@ if __name__ == '__main__':
     if is_ide:
         main(
             num_epochs=10,
-            job_dir='.',
-            reuse_job_dir=False,
+            job_dir='run12/train',
             training_data_dir='datasets',
             training_data_file='small.csv',
             learning_rate=1e-3,
-            reuse_epoch=False
+            reuse_epoch=True
         )
     else:
         args = get_args()
@@ -192,7 +199,6 @@ if __name__ == '__main__':
         main(
             num_epochs=args.num_epochs,
             job_dir=args.job_dir,
-            reuse_job_dir=args.reuse_job_dir,
             training_data_dir=args.training_data_dir,
             training_data_file=args.training_data_file,
             learning_rate=args.learning_rate,
