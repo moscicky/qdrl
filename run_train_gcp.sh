@@ -26,7 +26,7 @@ RUN_ID="run_1"
 TRAINING_DATA_FILE="small.csv"
 
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
-
+COMMIT_HASH=$(git rev-parse --short HEAD)
 
 if [[ -z "${BUCKET}" ]]; then
   echo "Bucket env variable not set, exiting"
@@ -52,11 +52,12 @@ echo "TASK_DIR: $TASK_DIR"
 echo "TRAINING_DATA_DIR: $TRAINING_DATA_DIR"
 echo "CONTAINER_IMAGE_URI: $CONTAINER_IMAGE_URI"
 echo "DISPLAY_NAME: $DISPLAY_NAME"
+echo "COMMIT_HASH: $COMMIT_HASH"
 # https://cloud.google.com/sdk/gcloud/reference/ai/custom-jobs/create
 
 gcloud ai custom-jobs create \
   --region=${REGION} \
   --display-name=${DISPLAY_NAME} \
   --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},container-image-uri=${CONTAINER_IMAGE_URI} \
-  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--training-data-dir=${TRAINING_DATA_DIR},--training-data-file=${TRAINING_DATA_FILE},--reuse-epoch
+  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--training-data-dir=${TRAINING_DATA_DIR},--training-data-file=${TRAINING_DATA_FILE},--reuse-epoch,--commit-hash=${COMMIT_HASH}
 #  #  --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},executor-image-uri=${EXECUTOR_IMAGE_URI},local-package-path=${WORKING_DIRECTORY},python-module=${PYTHON_MODULE} \
