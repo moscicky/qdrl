@@ -25,13 +25,16 @@ NUM_EPOCHS=10
 RUN_ID="run_1"
 TRAINING_DATA_FILE="small.csv"
 
+DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
+
 
 if [[ -z "${BUCKET}" ]]; then
   echo "Bucket env variable not set, exiting"
   exit(0)
 else
-  TASK_DIR="${BUCKET}/${TASK_ID}"
-  TRAINING_DATA_DIR="/gcs/${BUCKET}/dataset_v1"
+  BASE_DIR="/gcs/${BUCKET}"
+  TASK_DIR="${BASE_DIR}/${TASK_ID}"
+  TRAINING_DATA_DIR="${BASE_DIR}/dataset_v1"
 fi
 
 # TODO: remove this. Using prebuild image until pushing to eu gcr is possible
@@ -48,11 +51,12 @@ echo "TASK_ID: $TASK_ID"
 echo "TASK_DIR: $TASK_DIR"
 echo "TRAINING_DATA_DIR: $TRAINING_DATA_DIR"
 echo "CONTAINER_IMAGE_URI: $CONTAINER_IMAGE_URI"
+echo "DISPLAY_NAME: $DISPLAY_NAME"
 # https://cloud.google.com/sdk/gcloud/reference/ai/custom-jobs/create
 
 gcloud ai custom-jobs create \
   --region=${REGION} \
   --display-name=${DISPLAY_NAME} \
   --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},container-image-uri=${CONTAINER_IMAGE_URI} \
-  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_ID},--run-id=${RUN_ID},--training-data-dir=${TRAINING_DATA_DIR},--training-data-file=${TRAINING_DATA_FILE},--reuse-epoch
+  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--training-data-dir=${TRAINING_DATA_DIR},--training-data-file=${TRAINING_DATA_FILE},--reuse-epoch
 #  #  --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},executor-image-uri=${EXECUTOR_IMAGE_URI},local-package-path=${WORKING_DIRECTORY},python-module=${PYTHON_MODULE} \
