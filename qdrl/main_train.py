@@ -119,7 +119,8 @@ def get_args():
     args_parser.add_argument(
         '--commit-hash',
         type=str,
-        default=None
+        default=None,
+        required=True
     )
 
     return args_parser.parse_args()
@@ -212,7 +213,7 @@ def main(
 
 
 if __name__ == '__main__':
-    is_ide = True
+    is_ide = False
 
     if is_ide:
         main(

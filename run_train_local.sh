@@ -17,6 +17,10 @@ else
   OUTPUT_IMAGE_URI="eu.gcr.io/${PROJECT}/ebr/${DISPLAY_NAME}"
 fi
 
+COMMIT_HASH=$(git rev-parse --short HEAD)
+
+echo "COMMIT_HASH: ${COMMIT_HASH}"
+
 gcloud ai custom-jobs local-run \
   --executor-image-uri=$EXECUTOR_IMAGE_URI \
   --local-package-path=$WORKING_DIRECTORY \
@@ -29,4 +33,5 @@ gcloud ai custom-jobs local-run \
   --num-epochs=10 \
   --training-data-dir=datasets \
   --training-data-file=small.csv \
+  --commit-hash=$COMMIT_HASH
   --reuse-epoch
