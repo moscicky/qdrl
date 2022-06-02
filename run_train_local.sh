@@ -1,10 +1,12 @@
 EXECUTOR_IMAGE_URI="europe-docker.pkg.dev/vertex-ai/training/pytorch-xla.1-11:latest"
 WORKING_DIRECTORY="."
 PYTHON_MODULE="qdrl.main_train"
-DISPLAY_NAME="ebr-$(date +'%Y-%m-%d-%H-%M-%S')"
-OUTPUT_IMAGE_NAME="train_v1"
+RUN_ID="$(date +'%Y-%m-%d-%H-%M-%S')"
+#RUN_ID="..."
 
-EXTRA_DIRS="datasets,models,checkpoints"
+TASK_ID="gcp_setup"
+DISPLAY_NAME="${TASK_ID}_${RUN_ID}"
+EXTRA_DIRS="datasets,bucket"
 
 
 # build image which will be pushed to gcr
@@ -12,7 +14,7 @@ if [[ -z "${PROJECT}" ]]; then
   echo "Project env variable not set, exiting"
   exit(0)
 else
-  OUTPUT_IMAGE_URI="eu.gcr.io/${PROJECT}/${DISPLAY_NAME}"
+  OUTPUT_IMAGE_URI="eu.gcr.io/${PROJECT}/ebr/${DISPLAY_NAME}"
 fi
 
 gcloud ai custom-jobs local-run \
@@ -22,8 +24,9 @@ gcloud ai custom-jobs local-run \
   --output-image-uri=$OUTPUT_IMAGE_URI \
   --extra-dirs=$EXTRA_DIRS \
   -- \
+  --task-id=$TASK_ID \
+  --run-id=$RUN_ID \
   --num-epochs=10 \
-  --job-dir=$WORKING_DIRECTORY \
   --training-data-dir=datasets \
   --training-data-file=small.csv \
   --reuse-epoch

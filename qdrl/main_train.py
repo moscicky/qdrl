@@ -1,6 +1,7 @@
 import argparse
+import json
 import os.path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import torch
 from torch import nn
@@ -80,7 +81,13 @@ def get_args():
     )
 
     args_parser.add_argument(
-        '--job-dir',
+        '--task-id',
+        type=str,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--run-id',
         type=str,
         required=True
     )
@@ -109,6 +116,12 @@ def get_args():
         default=False,
     )
 
+    args_parser.add_argument(
+        '--commit-hash',
+        type=str,
+        default=None
+    )
+
     return args_parser.parse_args()
 
 
@@ -117,20 +130,35 @@ def init_directories(paths: List[str]):
         os.makedirs(path, exist_ok=True)
 
 
+def init_task_dir(task_id: str, run_id: str, meta: Dict):
+    if not os.path.isdir(task_id):
+        print("Creating task directory...")
+        init_directories([task_id])
+
+    run_id_path = os.path.join(task_id, run_id)
+    if not os.path.isdir(run_id_path):
+        print("Creating run directory")
+        init_directories([run_id_path])
+        metadata_path = os.path.join(task_id, run_id, "metadata.json")
+        with open(metadata_path, 'w') as mf:
+            json.dump(meta, mf)
+
+
 def main(
+        task_id: str,
+        run_id: str,
         num_epochs: int,
         learning_rate: float,
-        job_dir: str,
         reuse_epoch: bool,
         training_data_dir: str,
-        training_data_file: Optional[str]
+        training_data_file: Optional[str],
+        meta: Dict
 ):
-    if not os.path.isdir(job_dir):
-        init_directories([job_dir])
+    init_task_dir(task_id=task_id, run_id=run_id, meta=meta)
 
-    tensorboard_logdir_path = os.path.join(job_dir, "tensorboard")
-    checkpoint_dir_path = os.path.join(job_dir, "checkpoints")
-    model_output_dir_path = os.path.join(job_dir, "models")
+    tensorboard_logdir_path = os.path.join(task_id, "tensorboard", run_id)
+    checkpoint_dir_path = os.path.join(task_id, run_id, "checkpoints")
+    model_output_dir_path = os.path.join(task_id, run_id, "models")
     model_output_path = os.path.join(model_output_dir_path, "model_weights.pth")
     checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
 
@@ -184,16 +212,18 @@ def main(
 
 
 if __name__ == '__main__':
-    is_ide = False
+    is_ide = True
 
     if is_ide:
         main(
             num_epochs=10,
-            job_dir='run12/train',
+            task_id='bucket/gcp_setup',
+            run_id="run_2",
             training_data_dir='datasets',
             training_data_file='small.csv',
             learning_rate=1e-3,
-            reuse_epoch=True
+            reuse_epoch=True,
+            meta={"test": "abc"}
         )
     else:
         args = get_args()
@@ -201,9 +231,11 @@ if __name__ == '__main__':
 
         main(
             num_epochs=args.num_epochs,
-            job_dir=args.job_dir,
+            task_id=args.task_id,
+            run_id=args.run_id,
             training_data_dir=args.training_data_dir,
             training_data_file=args.training_data_file,
             learning_rate=args.learning_rate,
-            reuse_epoch=args.reuse_epoch
+            reuse_epoch=args.reuse_epoch,
+            meta=vars(args)
         )

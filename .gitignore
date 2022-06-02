@@ -5,5 +5,4 @@
 test-reports
 
 datasets/*
-checkpoints/*
-models/*
+bucket/*
