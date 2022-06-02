@@ -174,10 +174,13 @@ def main(
         checkpoints_path=checkpoints_path,
         tensorboard_writer=tensorboard_writer
     )
+    print("Training finished, saving the model from last epoch...")
 
     tensorboard_writer.flush()
     tensorboard_writer.close()
+
     torch.save(model.state_dict(), model_output_path)
+    print("Model saved successfully, exiting...")
 
 
 if __name__ == '__main__':
