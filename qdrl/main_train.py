@@ -1,19 +1,23 @@
-import argparse
 import json
 import os.path
 from typing import Optional, List, Dict
 
 import torch
 from torch import nn
+from torch.cpu.amp import autocast
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch import optim
 import torch.nn.functional as F
 
+from qdrl.args import get_args
+from qdrl.checkpoints import save_checkpoint
 from qdrl.loader import TripletsDataset
+from qdrl.models import SimpleTextEncoder
 
 
 def train(
+        device: torch.device,
         epoch_start: int,
         dataloader: DataLoader,
         model: nn.Module,
@@ -27,103 +31,24 @@ def train(
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
         for batch_idx, batch in enumerate(dataloader):
-            anchor, positive, negative = batch
+            anchor, positive, negative = batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
-            anchor_out = model(anchor)
-            positive_out = model(positive)
-            negative_out = model(negative)
+            with autocast():
+                anchor_out = model(anchor)
+                positive_out = model(positive)
+                negative_out = model(negative)
 
-            loss = loss_fn(anchor=anchor_out, positive=positive_out, negative=negative_out)
+                loss = loss_fn(anchor=anchor_out, positive=positive_out, negative=negative_out)
+
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            epoch_loss += loss.item()
+            batch_loss = loss.item()
+            epoch_loss += batch_loss
 
         save_checkpoint(epoch, checkpoints_path, model, optimizer)
         tensorboard_writer.add_scalar("Loss/train", epoch_loss, epoch)
         print(f"Finished epoch: {epoch}, loss: {epoch_loss}")
-
-
-class NeuralNet(nn.Module):
-    def __init__(self, num_embeddings: int, embedding_dim: int):
-        super(NeuralNet, self).__init__()
-        self.embedding_layer = nn.EmbeddingBag(num_embeddings=num_embeddings,
-                                               embedding_dim=embedding_dim,
-                                               mode="mean",
-                                               padding_idx=0)
-        self.fc = nn.Sequential(
-            nn.Linear(in_features=embedding_dim, out_features=embedding_dim // 2)
-        )
-
-    def forward(self, text: torch.Tensor) -> torch.Tensor:
-        return self.embedding_layer(text)
-
-
-EMBEDDING_DIM = 128
-NUM_EMBEDDINGS = 50000
-
-
-def save_checkpoint(epoch: int, path: str, model: nn.Module, optimizer: torch.optim.Optimizer) -> None:
-    torch.save({
-        'epoch': epoch,
-        'model_state_dict': model.state_dict(),
-        'optimizer_state_dict': optimizer.state_dict(),
-    }, path)
-
-
-def get_args():
-    args_parser = argparse.ArgumentParser()
-
-    args_parser.add_argument(
-        '--num-epochs',
-        type=int,
-        required=True
-    )
-
-    args_parser.add_argument(
-        '--task-id',
-        type=str,
-        required=True
-    )
-
-    args_parser.add_argument(
-        '--run-id',
-        type=str,
-        required=True
-    )
-
-    args_parser.add_argument(
-        '--training-data-dir',
-        type=str,
-        required=True,
-    )
-
-    args_parser.add_argument(
-        '--training-data-file',
-        type=str,
-        default=None
-    )
-
-    args_parser.add_argument(
-        '--learning-rate',
-        type=float,
-        default=1e-3
-    )
-
-    args_parser.add_argument(
-        '--reuse-epoch',
-        action='store_true',
-        default=False,
-    )
-
-    args_parser.add_argument(
-        '--commit-hash',
-        type=str,
-        default=None,
-        required=True
-    )
-
-    return args_parser.parse_args()
 
 
 def init_directories(paths: List[str]):
@@ -143,6 +68,11 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
         metadata_path = os.path.join(task_id, run_id, "metadata.json")
         with open(metadata_path, 'w') as mf:
             json.dump(meta, mf)
+
+
+EMBEDDING_DIM = 256
+FC_DIM = 128
+NUM_EMBEDDINGS = 50000
 
 
 def main(
@@ -173,18 +103,22 @@ def main(
 
     tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
 
-    model = NeuralNet(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM)
+    model = SimpleTextEncoder(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM, fc_dim=FC_DIM,
+                              output_dim=FC_DIM)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
     triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y))
 
     epoch_start = 0
 
+    device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
+    print(f"Will train using device: {device}")
+    model.to(device)
+
     if os.path.exists(checkpoints_path):
         print("Checkpoint found, trying to resume training...")
-        checkpoint = torch.load(checkpoints_path)
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        checkpoint = torch.load(checkpoints_path, map_location=device)
+        model.load_state_dict(checkpoint['model_state_dict'],)
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if reuse_epoch:
             epoch_start = checkpoint['epoch']
@@ -193,7 +127,10 @@ def main(
         print("Checkpoint not found, will create training directories from scratch...")
         init_directories([tensorboard_logdir_path, model_output_dir_path, checkpoint_dir_path])
 
+
+
     train(
+        device=device,
         epoch_start=epoch_start,
         dataloader=dataloader,
         model=model,
@@ -213,30 +150,16 @@ def main(
 
 
 if __name__ == '__main__':
-    is_ide = False
+    args = get_args()
+    print(f"Starting training job with args: {args}")
 
-    if is_ide:
-        main(
-            num_epochs=10,
-            task_id='bucket/gcp_setup',
-            run_id="run_2",
-            training_data_dir='datasets',
-            training_data_file='small.csv',
-            learning_rate=1e-3,
-            reuse_epoch=True,
-            meta={"test": "abc"}
-        )
-    else:
-        args = get_args()
-        print(f"Starting training job with args: {args}")
-
-        main(
-            num_epochs=args.num_epochs,
-            task_id=args.task_id,
-            run_id=args.run_id,
-            training_data_dir=args.training_data_dir,
-            training_data_file=args.training_data_file,
-            learning_rate=args.learning_rate,
-            reuse_epoch=args.reuse_epoch,
-            meta=vars(args)
-        )
+    main(
+        num_epochs=args.num_epochs,
+        task_id=args.task_id,
+        run_id=args.run_id,
+        training_data_dir=args.training_data_dir,
+        training_data_file=args.training_data_file,
+        learning_rate=args.learning_rate,
+        reuse_epoch=args.reuse_epoch,
+        meta=vars(args)
+    )

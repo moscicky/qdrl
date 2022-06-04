@@ -4,7 +4,7 @@ PYTHON_MODULE="qdrl.main_train"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M-%S')"
 #RUN_ID="..."
 
-TASK_ID="gcp_setup"
+TASK_ID="gpu_test"
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}"
 EXTRA_DIRS="datasets,bucket"
 
