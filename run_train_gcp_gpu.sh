@@ -22,10 +22,10 @@ GPU_CARD="NVIDIA_TESLA_P4"
 GPU_COUNT=1
 
 #job arguments
-TASK_ID="gcp_setup"
+TASK_ID="gpu_setup"
 NUM_EPOCHS=10
 RUN_ID="run_1"
-TRAINING_DATA_FILE="small.csv"
+TRAINING_DATA_FILE="dataset.csv"
 
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
 COMMIT_HASH=$(git rev-parse --short HEAD)
@@ -41,7 +41,7 @@ fi
 
 # TODO: remove this. Using prebuild image until pushing to eu gcr is possible
 if [[ -z "${CONTAINER_IMAGE_URI}" ]]; then
-  echo "Project env variable not set, exiting"
+  echo "Container image uri env set, exiting"
   exit(0)
 else
 

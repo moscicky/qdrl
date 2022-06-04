@@ -37,7 +37,7 @@ def prepare_model(
         model_path: str
 ) -> nn.Module:
     model = SimpleTextEncoder(num_embeddings=model_config.num_embeddings, embedding_dim=256, fc_dim=128, output_dim=128)
-    model.load_state_dict(torch.load(model_path))
+    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
     return model
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
     validation(
         model_config=ModelConfig(num_embeddings=50000, embedding_dim=128),
-        model_path='bucket/big_dataset/run_2/models/model_weights.pth',
+        model_path='bucket/gpu_setup/run_1/models/model_weights.pth',
         candidates_path='datasets/valid_candidates.json',
         queries_path='datasets/valid_queries.json',
         vectorizer_config=WordVectorizerConfig(max_length=10, num_features=50000),
