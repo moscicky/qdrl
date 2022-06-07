@@ -41,7 +41,7 @@ def train(
                 al = []
                 pl = []
                 nl = []
-                #TODO: zrobić to na indeksach!
+                #TODO: zrobić to na indeksach! https://github.com/adambielski/siamese-triplet/blob/master/losses.py#L87
                 for a_idx, a in enumerate(anchor_out):
                     for n_idx, n in enumerate(positive_out):
                         if n_idx != a_idx:
@@ -113,7 +113,7 @@ def main(
 
     dataset = ChunkingDataset(dataset_path, cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
                               max_length=10)
-    dataloader = DataLoader(dataset, batch_size=16, num_workers=2)
+    dataloader = DataLoader(dataset, batch_size=16, num_workers=2, drop_last=True)
 
     tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
 
