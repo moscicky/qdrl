@@ -2,6 +2,7 @@ import json
 import os.path
 from typing import Optional, List, Dict
 
+import numpy as np
 import torch
 from torch import nn
 from torch.cpu.amp import autocast
@@ -12,7 +13,7 @@ import torch.nn.functional as F
 
 from qdrl.args import get_args
 from qdrl.checkpoints import save_checkpoint
-from qdrl.loader import TripletsDataset
+from qdrl.loader import TripletsDataset, ChunkingDataset
 from qdrl.models import SimpleTextEncoder
 
 
@@ -31,14 +32,25 @@ def train(
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
         for batch_idx, batch in enumerate(dataloader):
-            anchor, positive, negative = batch[0].to(device), batch[1].to(device), batch[2].to(device)
+            anchor, positive = batch[0].to(device), batch[1].to(device)
 
             with autocast():
                 anchor_out = model(anchor)
                 positive_out = model(positive)
-                negative_out = model(negative)
 
-                loss = loss_fn(anchor=anchor_out, positive=positive_out, negative=negative_out)
+                al = []
+                pl = []
+                nl = []
+                for a_idx, a in enumerate(anchor_out):
+                    for n_idx, n in enumerate(positive_out):
+                        if n_idx != a_idx:
+                            al.append(a)
+                            pl.append(positive_out[a_idx])
+                            nl.append(n)
+                al = torch.stack(al, dim=0)
+                pl = torch.stack(pl, dim=0)
+                nl = torch.stack(nl, dim=0)
+                loss = loss_fn(anchor=al, positive=pl, negative=nl)
 
             optimizer.zero_grad()
             loss.backward()
@@ -98,8 +110,9 @@ def main(
     else:
         dataset_path = training_data_dir
 
-    dataset = TripletsDataset(dataset_path, num_features=NUM_EMBEDDINGS)
-    dataloader = DataLoader(dataset, batch_size=128, num_workers=0, shuffle=True)
+    dataset = ChunkingDataset(dataset_path, cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
+                              max_length=10)
+    dataloader = DataLoader(dataset, batch_size=16, num_workers=2)
 
     tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
 
@@ -118,7 +131,7 @@ def main(
     if os.path.exists(checkpoints_path):
         print("Checkpoint found, trying to resume training...")
         checkpoint = torch.load(checkpoints_path, map_location=device)
-        model.load_state_dict(checkpoint['model_state_dict'],)
+        model.load_state_dict(checkpoint['model_state_dict'], )
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         if reuse_epoch:
             epoch_start = checkpoint['epoch']
@@ -126,8 +139,6 @@ def main(
     else:
         print("Checkpoint not found, will create training directories from scratch...")
         init_directories([tensorboard_logdir_path, model_output_dir_path, checkpoint_dir_path])
-
-
 
     train(
         device=device,
