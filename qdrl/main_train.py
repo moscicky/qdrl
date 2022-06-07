@@ -41,6 +41,7 @@ def train(
                 al = []
                 pl = []
                 nl = []
+                #TODO: zrobić to na indeksach!
                 for a_idx, a in enumerate(anchor_out):
                     for n_idx, n in enumerate(positive_out):
                         if n_idx != a_idx:
