@@ -32,8 +32,8 @@ def train(
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
         for batch_idx, batch in enumerate(dataloader):
-            if batch_idx % 10 == 0:
-                print(batch_idx)
+            if batch_idx % 10_000 == 0:
+                print(f"starting batch: {batch_idx}")
             anchor, positive, negative = triplet_assembler.generate_triplets(model, batch, device)
             loss = loss_fn(anchor=anchor, positive=positive, negative=negative)
 
