@@ -32,8 +32,6 @@ def train(
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
         for batch_idx, batch in enumerate(dataloader):
-            if batch_idx % 10_000 == 0:
-                print(f"starting batch: {batch_idx}")
             anchor, positive, negative = triplet_assembler.generate_triplets(model, batch, device)
             loss = loss_fn(anchor=anchor, positive=positive, negative=negative)
 
@@ -42,6 +40,9 @@ def train(
             optimizer.step()
             batch_loss = loss.item()
             epoch_loss += batch_loss
+
+            if batch_idx % 10_000 == 0:
+                print(f"processed {batch_idx} batches")
 
         save_checkpoint(epoch, checkpoints_path, model, optimizer)
         tensorboard_writer.add_scalar("Loss/train", epoch_loss, epoch)
@@ -67,7 +68,6 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
             json.dump(meta, mf)
 
 
-BATCH_SIZE = 16
 EMBEDDING_DIM = 256
 FC_DIM = 128
 NUM_EMBEDDINGS = 50000
@@ -77,6 +77,7 @@ def main(
         task_id: str,
         run_id: str,
         num_epochs: int,
+        batch_size: int,
         learning_rate: float,
         reuse_epoch: bool,
         training_data_dir: str,
@@ -98,8 +99,8 @@ def main(
 
     dataset = ChunkingDataset(dataset_path, cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
                               max_length=10)
-    triplet_assembler = BatchNegativeTripletsAssembler(batch_size=BATCH_SIZE, negatives_count=BATCH_SIZE - 1)
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, num_workers=2, drop_last=True)
+    triplet_assembler = BatchNegativeTripletsAssembler(batch_size=batch_size, negatives_count=batch_size - 1)
+    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=2, drop_last=True)
 
     tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
 
@@ -156,6 +157,7 @@ if __name__ == '__main__':
         num_epochs=args.num_epochs,
         task_id=args.task_id,
         run_id=args.run_id,
+        batch_size=args.batch_size,
         training_data_dir=args.training_data_dir,
         training_data_file=args.training_data_file,
         learning_rate=args.learning_rate,

@@ -11,6 +11,12 @@ def get_args():
     )
 
     args_parser.add_argument(
+        '--batch-size',
+        type=int,
+        required=True
+    )
+
+    args_parser.add_argument(
         '--task-id',
         type=str,
         required=True
