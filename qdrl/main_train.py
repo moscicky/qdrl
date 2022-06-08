@@ -1,11 +1,9 @@
 import json
 import os.path
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Tuple
 
-import numpy as np
 import torch
 from torch import nn
-from torch.cpu.amp import autocast
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch import optim
@@ -13,8 +11,9 @@ import torch.nn.functional as F
 
 from qdrl.args import get_args
 from qdrl.checkpoints import save_checkpoint
-from qdrl.loader import TripletsDataset, ChunkingDataset
+from qdrl.loader import ChunkingDataset
 from qdrl.models import SimpleTextEncoder
+from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
 
 def train(
@@ -26,32 +25,17 @@ def train(
         optimizer: optim.Optimizer,
         n_epochs: int,
         checkpoints_path: str,
+        triplet_assembler: TripletAssembler,
         tensorboard_writer: SummaryWriter):
     model.train()
     for epoch in range(epoch_start, n_epochs):
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
         for batch_idx, batch in enumerate(dataloader):
-            anchor, positive = batch[0].to(device), batch[1].to(device)
-
-            with autocast():
-                anchor_out = model(anchor)
-                positive_out = model(positive)
-
-                al = []
-                pl = []
-                nl = []
-                #TODO: zrobić to na indeksach! https://github.com/adambielski/siamese-triplet/blob/master/losses.py#L87
-                for a_idx, a in enumerate(anchor_out):
-                    for n_idx, n in enumerate(positive_out):
-                        if n_idx != a_idx:
-                            al.append(a)
-                            pl.append(positive_out[a_idx])
-                            nl.append(n)
-                al = torch.stack(al, dim=0)
-                pl = torch.stack(pl, dim=0)
-                nl = torch.stack(nl, dim=0)
-                loss = loss_fn(anchor=al, positive=pl, negative=nl)
+            if batch_idx % 10 == 0:
+                print(batch_idx)
+            anchor, positive, negative = triplet_assembler.generate_triplets(model, batch, device)
+            loss = loss_fn(anchor=anchor, positive=positive, negative=negative)
 
             optimizer.zero_grad()
             loss.backward()
@@ -83,6 +67,7 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
             json.dump(meta, mf)
 
 
+BATCH_SIZE = 16
 EMBEDDING_DIM = 256
 FC_DIM = 128
 NUM_EMBEDDINGS = 50000
@@ -113,7 +98,8 @@ def main(
 
     dataset = ChunkingDataset(dataset_path, cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
                               max_length=10)
-    dataloader = DataLoader(dataset, batch_size=16, num_workers=2, drop_last=True)
+    triplet_assembler = BatchNegativeTripletsAssembler(batch_size=BATCH_SIZE, negatives_count=BATCH_SIZE - 1)
+    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, num_workers=2, drop_last=True)
 
     tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
 
@@ -150,6 +136,7 @@ def main(
         optimizer=optimizer,
         n_epochs=num_epochs,
         checkpoints_path=checkpoints_path,
+        triplet_assembler=triplet_assembler,
         tensorboard_writer=tensorboard_writer
     )
     print("Training finished, saving the model from last epoch...")
