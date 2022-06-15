@@ -1,3 +1,4 @@
+import csv
 import os
 from typing import List
 
@@ -53,9 +54,13 @@ class LazyTextDataset(IterableDataset):
 
     @staticmethod
     def _read_csv(path: str, cols: List[str]) -> pd.DataFrame:
-        with open(path, "rb") as f:
-            df = pd.read_csv(f, sep=",", usecols=cols)
-            return df
+        try:
+            with open(path, "rb") as f:
+                df = pd.read_csv(f, sep=",", usecols=cols)
+                return df
+        except Exception as e:
+            print(f"Failed to load file: {path}, error: {e}, skipping")
+            return pd.DataFrame(columns=cols)
 
 
 class ChunkingDataset(IterableDataset):

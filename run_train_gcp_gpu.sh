@@ -24,7 +24,7 @@ GPU_COUNT=1
 #job arguments
 TASK_ID="chunked_dataset"
 NUM_EPOCHS=10
-RUN_ID="run_1"sprint
+RUN_ID="run_3"
 BATCH_SIZE=32
 LEARNING_RATE=1e-2
 
