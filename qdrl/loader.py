@@ -30,7 +30,7 @@ class TripletsDataset(Dataset):
     @staticmethod
     def _read_csv(path: str) -> pd.DataFrame:
         with open(path, "rb") as f:
-            df = pd.read_csv(f, sep=",")
+            df = pd.read_csv(f, sep=",", error_bad_lines=False, warn_bad_lines=True)
             return df
 
 

@@ -33,6 +33,6 @@ gcloud ai custom-jobs local-run \
   --num-epochs=3 \
   --training-data-dir=datasets/small \
   --commit-hash=$COMMIT_HASH \
-  --batch-size=32 \
+  --batch-size=64 \
   --learning-rate=${LEARNING_RATE} \
   --reuse-epoch

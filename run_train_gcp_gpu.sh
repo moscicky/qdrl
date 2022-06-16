@@ -25,7 +25,7 @@ GPU_COUNT=1
 TASK_ID="chunked_dataset"
 NUM_EPOCHS=10
 RUN_ID="run_3"
-BATCH_SIZE=32
+BATCH_SIZE=64
 LEARNING_RATE=1e-2
 
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
