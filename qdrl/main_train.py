@@ -1,6 +1,6 @@
 import json
 import os.path
-from typing import Optional, List, Dict, Tuple
+from typing import List, Dict, Callable
 
 import torch
 from torch import nn
@@ -12,6 +12,7 @@ import torch.nn.functional as F
 from qdrl.args import get_args
 from qdrl.checkpoints import save_checkpoint
 from qdrl.loader import ChunkingDataset
+from qdrl.loss_validator import LossValidator
 from qdrl.models import SimpleTextEncoder
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
@@ -26,9 +27,11 @@ def train(
         n_epochs: int,
         checkpoints_path: str,
         triplet_assembler: TripletAssembler,
-        tensorboard_writer: SummaryWriter):
-    model.train()
+        tensorboard_writer: SummaryWriter,
+        loss_validator: LossValidator
+):
     for epoch in range(epoch_start, n_epochs):
+        model.train()
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
         for batch_idx, batch in enumerate(dataloader):
@@ -45,8 +48,16 @@ def train(
                 print(f"processed {batch_idx} batches")
 
         save_checkpoint(epoch, checkpoints_path, model, optimizer)
+
+        average_loss = epoch_loss / batch_idx
+        print(f"Finished training epoch: {epoch}, total loss: {epoch_loss}, average loss: {average_loss}")
+
+        validation_total_loss, validation_average_loss = loss_validator.validate(model, epoch)
+
         tensorboard_writer.add_scalar("Loss/train", epoch_loss, epoch)
-        print(f"Finished epoch: {epoch}, loss: {epoch_loss}")
+        tensorboard_writer.add_scalar("Loss/valid", validation_total_loss, epoch)
+        tensorboard_writer.add_scalar("AverageLoss/train", average_loss, epoch)
+        tensorboard_writer.add_scalar("AverageLoss/valid", validation_average_loss, epoch)
 
 
 def init_directories(paths: List[str]):
@@ -73,6 +84,10 @@ FC_DIM = 128
 NUM_EMBEDDINGS = 50000
 
 
+def dataset_factory(cols: List[str], num_features: int, max_length: int) -> Callable[[str], ChunkingDataset]:
+    return lambda p: ChunkingDataset(p, cols=cols, num_features=num_features, max_length=max_length)
+
+
 def main(
         task_id: str,
         run_id: str,
@@ -81,7 +96,7 @@ def main(
         learning_rate: float,
         reuse_epoch: bool,
         training_data_dir: str,
-        training_data_file: Optional[str],
+        validation_data_dir: str,
         meta: Dict
 ):
     init_task_dir(task_id=task_id, run_id=run_id, meta=meta)
@@ -92,17 +107,25 @@ def main(
     model_output_path = os.path.join(model_output_dir_path, "model_weights.pth")
     checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
 
-    if training_data_file:
-        dataset_path = os.path.join(training_data_dir, training_data_file)
-    else:
-        dataset_path = training_data_dir
+    dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
+                                 max_length=10)
+    training_dataset = dataset_fn(training_data_dir)
+    validation_dataset = dataset_fn(validation_data_dir)
 
-    dataset = ChunkingDataset(dataset_path, cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
-                              max_length=10)
     triplet_assembler = BatchNegativeTripletsAssembler(batch_size=batch_size, negatives_count=batch_size - 1)
-    dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=2, drop_last=True)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=2, drop_last=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=2, drop_last=True)
+
+    layout = {
+        "metrics": {
+            "loss": ["Multiline", ["Loss/train", "Loss/valid"]],
+            "averageLoss": ["Multiline", ["AverageLoss/train", "AverageLoss/valid"]],
+        },
+    }
 
     tensorboard_writer = SummaryWriter(log_dir=tensorboard_logdir_path)
+
+    tensorboard_writer.add_custom_scalars(layout)
 
     model = SimpleTextEncoder(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM, fc_dim=FC_DIM,
                               output_dim=FC_DIM)
@@ -128,17 +151,25 @@ def main(
         print("Checkpoint not found, will create training directories from scratch...")
         init_directories([tensorboard_logdir_path, model_output_dir_path, checkpoint_dir_path])
 
+    validator = LossValidator(
+        dataloader=validation_dataloader,
+        loss_fn=triplet_loss,
+        triplet_assembler=triplet_assembler,
+        device=device
+    )
+
     train(
         device=device,
         epoch_start=epoch_start,
-        dataloader=dataloader,
+        dataloader=training_dataloader,
         model=model,
         loss_fn=triplet_loss,
         optimizer=optimizer,
         n_epochs=num_epochs,
         checkpoints_path=checkpoints_path,
         triplet_assembler=triplet_assembler,
-        tensorboard_writer=tensorboard_writer
+        tensorboard_writer=tensorboard_writer,
+        loss_validator=validator
     )
     print("Training finished, saving the model from last epoch...")
 
@@ -153,14 +184,16 @@ if __name__ == '__main__':
     args = get_args()
     print(f"Starting training job with args: {args}")
 
+    os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+
     main(
         num_epochs=args.num_epochs,
         task_id=args.task_id,
         run_id=args.run_id,
         batch_size=args.batch_size,
         training_data_dir=args.training_data_dir,
-        training_data_file=args.training_data_file,
         learning_rate=args.learning_rate,
         reuse_epoch=args.reuse_epoch,
+        validation_data_dir=args.validation_data_dir,
         meta=vars(args)
     )

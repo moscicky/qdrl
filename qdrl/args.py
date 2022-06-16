@@ -35,6 +35,12 @@ def get_args():
     )
 
     args_parser.add_argument(
+        '--validation-data-dir',
+        type=str,
+        required=True,
+    )
+
+    args_parser.add_argument(
         '--training-data-file',
         type=str,
         default=None
