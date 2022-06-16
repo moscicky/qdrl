@@ -65,4 +65,10 @@ def get_args():
         required=True
     )
 
+    args_parser.add_argument(
+        '--dataloader-workers',
+        type=int,
+        required=True
+    )
+
     return args_parser.parse_args()

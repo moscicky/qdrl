@@ -97,7 +97,8 @@ def main(
         reuse_epoch: bool,
         training_data_dir: str,
         validation_data_dir: str,
-        meta: Dict
+        meta: Dict,
+        dataloader_workers: int
 ):
     init_task_dir(task_id=task_id, run_id=run_id, meta=meta)
 
@@ -113,8 +114,8 @@ def main(
     validation_dataset = dataset_fn(validation_data_dir)
 
     triplet_assembler = BatchNegativeTripletsAssembler(batch_size=batch_size, negatives_count=batch_size - 1)
-    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=2, drop_last=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=2, drop_last=True)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=dataloader_workers, drop_last=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=dataloader_workers, drop_last=True)
 
     layout = {
         "metrics": {
@@ -195,5 +196,6 @@ if __name__ == '__main__':
         learning_rate=args.learning_rate,
         reuse_epoch=args.reuse_epoch,
         validation_data_dir=args.validation_data_dir,
-        meta=vars(args)
+        meta=vars(args),
+        dataloader_workers=args.dataloader_workers
     )

@@ -36,4 +36,5 @@ gcloud ai custom-jobs local-run \
   --batch-size=64 \
   --learning-rate=${LEARNING_RATE} \
   --reuse-epoch \
-  --validation-data-dir=datasets/small_validation_dataset
+  --validation-data-dir=datasets/small_validation_dataset\
+  --dataloader-workers=4
