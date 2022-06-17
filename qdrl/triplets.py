@@ -3,7 +3,7 @@ from typing import Tuple, List
 
 import torch
 from torch import nn
-from torch.cpu.amp import autocast
+from torch.cuda.amp import autocast
 
 
 class TripletAssembler(abc.ABC):
