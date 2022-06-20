@@ -129,7 +129,35 @@ def candidates_index(candidates_path: str, num_embeddings: int, embedding_dim: i
     print("Embedded candidates")
     index = create_index(embedding_dim, candidate_embeddings, similarity_metric)
     print("Created candidates index")
-    return index, candidates_by_product_id
+    return index, candidates_by_product_id, candidates
+
+
+def interactive_search(candidates_path: str,
+                       num_embeddings: int,
+                       text_max_length: int,
+                       embedding_dim: int,
+                       embedding_batch_size: int,
+                       query_batch_size: int,
+                       similarity_metric: SimilarityMetric,
+                       k: int,
+                       model: nn.Module):
+    index, candidates_by_product_id, candidates = candidates_index(
+        candidates_path=candidates_path,
+        num_embeddings=num_embeddings,
+        embedding_dim=embedding_dim,
+        text_max_length=text_max_length,
+        embedding_batch_size=embedding_batch_size,
+        similarity_metric=similarity_metric
+    )
+
+    while True:
+        query = input("Type your query: \n")
+        query_vectorized = vectorize([query], num_embeddings=num_embeddings, text_max_length=text_max_length)
+        query_embeddings = embed(query_vectorized, model, batch_size=embedding_batch_size)
+        query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
+        for query_result in query_results.tolist():
+            for result_idx, result in enumerate(query_result):
+                print(f"{result_idx}: {candidates[result]['product_name']}")
 
 
 def recall_validation(
@@ -144,7 +172,7 @@ def recall_validation(
         k: int,
         model: nn.Module
 ):
-    index, candidates_by_product_id = candidates_index(
+    index, candidates_by_product_id, _ = candidates_index(
         candidates_path=candidates_path,
         num_embeddings=num_embeddings,
         embedding_dim=embedding_dim,
@@ -190,13 +218,25 @@ if __name__ == '__main__':
 
     model = prepare_model(model_config, model_path)
 
-    recall_validation(candidates_path,
-                      queries_path,
-                      num_embeddings=model_config.num_embeddings,
-                      text_max_length=10,
-                      embedding_dim=128,
-                      similarity_metric=SimilarityMetric.COSINE,
-                      model=model,
-                      embedding_batch_size=4096,
-                      k=1024,
-                      query_batch_size=128)
+    # recall_validation(candidates_path,
+    #                   queries_path,
+    #                   num_embeddings=model_config.num_embeddings,
+    #                   text_max_length=10,
+    #                   embedding_dim=128,
+    #                   similarity_metric=SimilarityMetric.COSINE,
+    #                   model=model,
+    #                   embedding_batch_size=4096,
+    #                   k=1024,
+    #                   query_batch_size=128)
+
+    interactive_search(
+        candidates_path,
+        num_embeddings=model_config.num_embeddings,
+        text_max_length=10,
+        embedding_dim=128,
+        similarity_metric=SimilarityMetric.COSINE,
+        model=model,
+        embedding_batch_size=4096,
+        k=30,
+        query_batch_size=128
+    )
