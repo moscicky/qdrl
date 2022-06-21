@@ -1,11 +1,12 @@
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 import faiss
 import numpy as np
 import torch
 from torch import nn
+from torch.utils.tensorboard import SummaryWriter
 
 from qdrl.configs import SimilarityMetric, ModelConfig
 from qdrl.models import SimpleTextEncoder
@@ -129,7 +130,40 @@ def candidates_index(candidates_path: str, num_embeddings: int, embedding_dim: i
     print("Embedded candidates")
     index = create_index(embedding_dim, candidate_embeddings, similarity_metric)
     print("Created candidates index")
-    return index, candidates_by_product_id, candidates
+    return index, candidates_by_product_id, candidates, candidate_embeddings
+
+
+def write_embeddings(logdir_path: str, candidates: Dict[int, Dict], candidate_embeddings: np.ndarray):
+    indices = np.random.randint(low=0, high=len(candidates), size=10000)
+    tensorboard_writer = SummaryWriter(log_dir=logdir_path)
+    product_names = [v["product_name"] for k, v in candidates.items()]
+    meta = np.array(product_names)[indices]
+    tensorboard_writer.add_embedding(
+        mat=candidate_embeddings[indices, :], metadata=meta
+    )
+    tensorboard_writer.close()
+
+
+def calculate_recall(query_results: np.ndarray, queries: List[Dict],
+                     candidates_by_product_id: Dict[str, Dict]) -> float:
+    recalls = []
+
+    for idx, query_result in enumerate(query_results.tolist()):
+        relevant_candidate_ids = queries[idx]["relevant_product_ids"]
+        relevant_aux_ids = []
+        for relevant_candidate_id in relevant_candidate_ids:
+            if relevant_candidate_id not in candidates_by_product_id:
+                print(f"{relevant_candidate_id} not in candidates set, skipping")
+                continue
+            else:
+                relevant_aux_ids.append(candidates_by_product_id[relevant_candidate_id])
+        if relevant_aux_ids:
+            intersection = set(query_result).intersection(set(relevant_aux_ids))
+            num_found = len(intersection)
+            recall = num_found / len(relevant_aux_ids)
+            recalls.append(recall)
+    recall = np.mean(np.array(recalls))
+    return recall
 
 
 def interactive_search(candidates_path: str,
@@ -141,7 +175,7 @@ def interactive_search(candidates_path: str,
                        similarity_metric: SimilarityMetric,
                        k: int,
                        model: nn.Module):
-    index, candidates_by_product_id, candidates = candidates_index(
+    index, candidates_by_product_id, candidates, _ = candidates_index(
         candidates_path=candidates_path,
         num_embeddings=num_embeddings,
         embedding_dim=embedding_dim,
@@ -170,9 +204,10 @@ def recall_validation(
         query_batch_size: int,
         similarity_metric: SimilarityMetric,
         k: int,
-        model: nn.Module
+        model: nn.Module,
+        visualize_path: Optional[str] = None
 ):
-    index, candidates_by_product_id, _ = candidates_index(
+    index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
         candidates_path=candidates_path,
         num_embeddings=num_embeddings,
         embedding_dim=embedding_dim,
@@ -180,6 +215,7 @@ def recall_validation(
         embedding_batch_size=embedding_batch_size,
         similarity_metric=similarity_metric
     )
+
     queries = load_queries(queries_path)
     print("Loaded queries")
     queries_vectorized = vectorize([q["query_search_phrase"] for q in queries], num_embeddings=num_embeddings,
@@ -189,23 +225,11 @@ def recall_validation(
     print("Embedded queries")
     query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
     print("Executed queries")
-    recalls = []
-    for idx, query_result in enumerate(query_results.tolist()):
-        relevant_candidate_ids = queries[idx]["relevant_product_ids"]
-        relevant_aux_ids = []
-        for relevant_candidate_id in relevant_candidate_ids:
-            if relevant_candidate_id not in candidates_by_product_id:
-                print(f"{relevant_candidate_id} not in candidates set, skipping")
-                continue
-            else:
-                relevant_aux_ids.append(candidates_by_product_id[relevant_candidate_id])
-        if relevant_aux_ids:
-            intersection = set(query_result).intersection(set(relevant_aux_ids))
-            num_found = len(intersection)
-            recall = num_found / len(relevant_aux_ids)
-            recalls.append(recall)
-    recall = np.mean(np.array(recalls))
-    print(f"Average recall: {recall}")
+    recall = calculate_recall(query_results, queries, candidates_by_product_id)
+    print(f"Average recall@{k}: {recall}")
+    if visualize_path:
+        write_embeddings(visualize_path, candidates, candidate_embeddings)
+        print("Saved embedding visualization")
 
 
 if __name__ == '__main__':
@@ -218,25 +242,27 @@ if __name__ == '__main__':
 
     model = prepare_model(model_config, model_path)
 
-    # recall_validation(candidates_path,
-    #                   queries_path,
-    #                   num_embeddings=model_config.num_embeddings,
-    #                   text_max_length=10,
-    #                   embedding_dim=128,
-    #                   similarity_metric=SimilarityMetric.COSINE,
-    #                   model=model,
-    #                   embedding_batch_size=4096,
-    #                   k=1024,
-    #                   query_batch_size=128)
+    recall_validation(candidates_path,
+                      queries_path,
+                      num_embeddings=model_config.num_embeddings,
+                      text_max_length=10,
+                      embedding_dim=128,
+                      similarity_metric=SimilarityMetric.COSINE,
+                      model=model,
+                      embedding_batch_size=4096,
+                      k=1024,
+                      query_batch_size=128,
+                      visualize_path="tensorboard/embeddings"
+                      )
 
-    interactive_search(
-        candidates_path,
-        num_embeddings=model_config.num_embeddings,
-        text_max_length=10,
-        embedding_dim=128,
-        similarity_metric=SimilarityMetric.COSINE,
-        model=model,
-        embedding_batch_size=4096,
-        k=30,
-        query_batch_size=128
-    )
+    # interactive_search(
+    #     candidates_path,
+    #     num_embeddings=model_config.num_embeddings,
+    #     text_max_length=10,
+    #     embedding_dim=128,
+    #     similarity_metric=SimilarityMetric.COSINE,
+    #     model=model,
+    #     embedding_batch_size=4096,
+    #     k=30,
+    #     query_batch_size=128
+    # )
