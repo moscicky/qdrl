@@ -71,4 +71,22 @@ def get_args():
         required=True
     )
 
+    args_parser.add_argument(
+        '--recall-validation-candidates_path',
+        type=str,
+        default=None
+    )
+
+    args_parser.add_argument(
+        '--recall-validation-queries-path',
+        type=str,
+        default=None
+    )
+
+    args_parser.add_argument(
+        '--validate-recall',
+        action='store_true',
+        default=False,
+    )
+
     return args_parser.parse_args()

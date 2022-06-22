@@ -75,6 +75,7 @@ def create_index(
         dim: int,
         embeddings: np.ndarray,
         similarity_metric: SimilarityMetric):
+    print("Trying to create index")
     index = faiss.IndexFlat(dim, faiss.METRIC_INNER_PRODUCT)
     if similarity_metric == SimilarityMetric.COSINE:
         faiss.normalize_L2(embeddings)
@@ -119,7 +120,7 @@ def search(embeddings: np.ndarray, batch_size: int, similarity_metric: Similarit
 
 
 def candidates_index(candidates_path: str, num_embeddings: int, embedding_dim: int, text_max_length: int,
-                     embedding_batch_size: int, similarity_metric: SimilarityMetric):
+                     embedding_batch_size: int, similarity_metric: SimilarityMetric, model: nn.Module):
     candidates = load_candidates(candidates_path)
     candidates_by_product_id = {v["product_id"]: k for k, v in candidates.items()}
     print("Loaded candidates")
@@ -181,7 +182,8 @@ def interactive_search(candidates_path: str,
         embedding_dim=embedding_dim,
         text_max_length=text_max_length,
         embedding_batch_size=embedding_batch_size,
-        similarity_metric=similarity_metric
+        similarity_metric=similarity_metric,
+        model=model
     )
 
     while True:
@@ -213,7 +215,8 @@ def recall_validation(
         embedding_dim=embedding_dim,
         text_max_length=text_max_length,
         embedding_batch_size=embedding_batch_size,
-        similarity_metric=similarity_metric
+        similarity_metric=similarity_metric,
+        model=model
     )
 
     queries = load_queries(queries_path)
@@ -230,6 +233,43 @@ def recall_validation(
     if visualize_path:
         write_embeddings(visualize_path, candidates, candidate_embeddings)
         print("Saved embedding visualization")
+
+
+class RecallValidator:
+    def __init__(self,
+                 candidates_path: str,
+                 queries_path: str,
+                 num_embeddings: int,
+                 text_max_length: int,
+                 embedding_dim: int,
+                 embedding_batch_size: int,
+                 query_batch_size: int,
+                 similarity_metric: SimilarityMetric,
+                 k: int
+                 ):
+        self.candidates_path = candidates_path
+        self.queries_path = queries_path
+        self.num_embeddings = num_embeddings
+        self.text_max_length = text_max_length
+        self.embedding_dim = embedding_dim
+        self.embedding_batch_size = embedding_batch_size
+        self.query_batch_size = query_batch_size
+        self.similarity_metric = similarity_metric
+        self.k = k
+
+    def validate(self, model: nn.Module):
+        recall_validation(
+            candidates_path=self.candidates_path,
+            queries_path=self.queries_path,
+            num_embeddings=self.num_embeddings,
+            text_max_length=self.text_max_length,
+            embedding_dim=self.embedding_dim,
+            similarity_metric=self.similarity_metric,
+            model=model,
+            embedding_batch_size=self.embedding_batch_size,
+            k=self.k,
+            query_batch_size=self.query_batch_size
+        )
 
 
 if __name__ == '__main__':

@@ -1,6 +1,6 @@
 import json
 import os.path
-from typing import List, Dict, Callable
+from typing import List, Dict, Callable, Optional
 
 import torch
 from torch import nn
@@ -11,9 +11,11 @@ import torch.nn.functional as F
 
 from qdrl.args import get_args
 from qdrl.checkpoints import save_checkpoint
+from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_validator import LossValidator
 from qdrl.models import SimpleTextEncoder
+from qdrl.recall_validator import recall_validation, RecallValidator
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
 
@@ -28,7 +30,8 @@ def train(
         checkpoints_path: str,
         triplet_assembler: TripletAssembler,
         tensorboard_writer: SummaryWriter,
-        loss_validator: LossValidator
+        loss_validator: LossValidator,
+        recall_validator: Optional[RecallValidator] = None
 ):
     for epoch in range(epoch_start, n_epochs):
         model.train()
@@ -59,6 +62,11 @@ def train(
         tensorboard_writer.add_scalar("AverageLoss/train", average_loss, epoch)
         tensorboard_writer.add_scalar("AverageLoss/valid", validation_average_loss, epoch)
 
+        if recall_validator:
+            print("Starting recall validation")
+            os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+            recall_validator.validate(model)
+
 
 def init_directories(paths: List[str]):
     for path in paths:
@@ -82,6 +90,7 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
 EMBEDDING_DIM = 256
 FC_DIM = 128
 NUM_EMBEDDINGS = 50000
+TEXT_MAX_LENGTH = 10
 
 
 def dataset_factory(cols: List[str], num_features: int, max_length: int) -> Callable[[str], ChunkingDataset]:
@@ -109,7 +118,7 @@ def main(
     checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
 
     dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
-                                 max_length=10)
+                                 max_length=TEXT_MAX_LENGTH)
     training_dataset = dataset_fn(training_data_dir)
     validation_dataset = dataset_fn(validation_data_dir)
 
@@ -159,6 +168,18 @@ def main(
         device=device
     )
 
+    recall_validator = RecallValidator(
+        candidates_path=args.recall_validation_candidates_path,
+        queries_path=args.recall_validation_queries_path,
+        num_embeddings=NUM_EMBEDDINGS,
+        text_max_length=TEXT_MAX_LENGTH,
+        embedding_dim=FC_DIM,
+        similarity_metric=SimilarityMetric.COSINE,
+        embedding_batch_size=4096,
+        k=1024,
+        query_batch_size=128
+    )
+
     train(
         device=device,
         epoch_start=epoch_start,
@@ -170,7 +191,8 @@ def main(
         checkpoints_path=checkpoints_path,
         triplet_assembler=triplet_assembler,
         tensorboard_writer=tensorboard_writer,
-        loss_validator=validator
+        loss_validator=validator,
+        recall_validator=recall_validator if args.validate_recall else None
     )
     print("Training finished, saving the model from last epoch...")
 

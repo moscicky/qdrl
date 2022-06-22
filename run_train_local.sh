@@ -37,4 +37,7 @@ gcloud ai custom-jobs local-run \
   --learning-rate=${LEARNING_RATE} \
   --reuse-epoch \
   --validation-data-dir=datasets/small_validation_dataset\
-  --dataloader-workers=4
+  --dataloader-workers=4 \
+  --recall-validation-candidates_path datasets/recall_evaluation_dataset/candidates/candidates.json \
+  --recall-validation-queries-path datasets/recall_evaluation_dataset/queries/queries.json \
+  --validate-recall
