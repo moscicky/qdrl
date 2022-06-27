@@ -18,16 +18,16 @@ WORKING_DIRECTORY="."
 #machine spec
 MACHINE_TYPE="n1-standard-8"
 REPLICA_COUNT=1
-GPU_CARD="NVIDIA_TESLA_V100"
+GPU_CARD="NVIDIA_TESLA_P4"
 GPU_COUNT=1
 
 #job arguments
 TASK_ID="recall_validation"
 NUM_EPOCHS=10
-RUN_ID="run_1_batch_size_32"
+RUN_ID="run_2_batch_size_32"
 BATCH_SIZE=32
 LEARNING_RATE=1e-2
-DATALOADER_WORKERS=8
+DATALOADER_WORKERS=4
 
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
 COMMIT_HASH=$(git rev-parse --short HEAD)
@@ -37,7 +37,7 @@ if [[ -z "${BUCKET}" ]]; then
   exit(0)
 else
   BASE_DIR="/gcs/${BUCKET}"
-  TASK_DIR="${BASE_DIR}/${TASK_ID}"
+  TASK_DIR="${BASE_DIR}/training/${TASK_ID}"
   TRAINING_DATA_DIR="${BASE_DIR}/dataset_v1/"
   VALIDATION_DATA_DIR="${BASE_DIR}/evaluation_dataset_v1/"
   RECALL_VALIDATION_CANDIDATES_PATH="${BASE_DIR}/recall_evaluation_dataset/candidates/chunk-000000000000.json"
