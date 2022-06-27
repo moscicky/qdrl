@@ -30,7 +30,7 @@ gcloud ai custom-jobs local-run \
   -- \
   --task-id=$TASK_ID \
   --run-id=$RUN_ID \
-  --num-epochs=3 \
+  --num-epochs=1 \
   --training-data-dir=datasets/small_training_dataset \
   --commit-hash=$COMMIT_HASH \
   --batch-size=64 \
@@ -38,6 +38,6 @@ gcloud ai custom-jobs local-run \
   --reuse-epoch \
   --validation-data-dir=datasets/small_validation_dataset\
   --dataloader-workers=4 \
-  --recall-validation-candidates_path datasets/recall_evaluation_dataset/candidates/candidates.json \
+  --recall-validation-candidates-path datasets/recall_evaluation_dataset/candidates/candidates.json \
   --recall-validation-queries-path datasets/recall_evaluation_dataset/queries/queries.json \
   --validate-recall

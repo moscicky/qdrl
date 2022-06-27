@@ -72,7 +72,7 @@ def get_args():
     )
 
     args_parser.add_argument(
-        '--recall-validation-candidates_path',
+        '--recall-validation-candidates-path',
         type=str,
         default=None
     )
