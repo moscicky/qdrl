@@ -234,6 +234,8 @@ def recall_validation(
         write_embeddings(visualize_path, candidates, candidate_embeddings)
         print("Saved embedding visualization")
 
+    return recall
+
 
 class RecallValidator:
     def __init__(self,
@@ -258,7 +260,7 @@ class RecallValidator:
         self.k = k
 
     def validate(self, model: nn.Module):
-        recall_validation(
+        return recall_validation(
             candidates_path=self.candidates_path,
             queries_path=self.queries_path,
             num_embeddings=self.num_embeddings,
