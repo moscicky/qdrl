@@ -62,7 +62,6 @@ def train(
         tensorboard_writer.add_scalar("AverageLoss/train", average_loss, epoch)
         tensorboard_writer.add_scalar("AverageLoss/valid", validation_average_loss, epoch)
 
-        model.to('cpu')
         if recall_validator:
             print("Starting recall validation")
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

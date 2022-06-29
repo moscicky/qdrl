@@ -62,6 +62,7 @@ def embed(texts: np.ndarray, model: nn.Module, batch_size: int, device: torch.de
             print(f"processed {(batch_idx / batches) * 100} % batches")
         batch = texts[idx:idx + batch_size, :]
         batch_tensor = torch.from_numpy(batch).to(device)
+        print(f"batch tensor device: {batch_tensor.get_device()}")
         with torch.no_grad():
             text_embedded = model(batch_tensor).detach().cpu().numpy()
         embeddings.append(text_embedded)
