@@ -34,7 +34,6 @@ def train(
         recall_validator: Optional[RecallValidator] = None
 ):
     for epoch in range(epoch_start, n_epochs):
-        model.to(device)
         model.train()
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")

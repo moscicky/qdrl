@@ -22,13 +22,13 @@ GPU_CARD="NVIDIA_TESLA_P4"
 GPU_COUNT=1
 
 #job arguments
-TASK_ID="recall_validation_huge_dataset"
+TASK_ID="recall_validation_small_dataset"
 NUM_EPOCHS=10
 RUN_ID="run_1_batch_size_32"
 BATCH_SIZE=32
 LEARNING_RATE=1e-2
 DATALOADER_WORKERS=4
-DATASET_SUBDIR="dataset_20220425-20220627"
+DATASET_SUBDIR="dataset_small"
 
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
 COMMIT_HASH=$(git rev-parse --short HEAD)
@@ -64,5 +64,5 @@ gcloud ai custom-jobs create \
   --region=${REGION} \
   --display-name=${DISPLAY_NAME} \
   --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},container-image-uri=${CONTAINER_IMAGE_URI},accelerator-type=${GPU_CARD},accelerator-count=${GPU_COUNT} \
-  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--dataset-dir=${$DATASET_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--dataloader-workers=${DATALOADER_WORKERS},--validate-recall
+  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--dataset-dir=${DATASET_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--dataloader-workers=${DATALOADER_WORKERS},--validate-recall
 #  #  --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},executor-image-uri=${EXECUTOR_IMAGE_URI},local-package-path=${WORKING_DIRECTORY},python-module=${PYTHON_MODULE} \

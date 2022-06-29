@@ -48,7 +48,7 @@ def vectorize(texts: List[str],
     return np.array(vectorized)
 
 
-def embed(texts: np.ndarray, model: nn.Module, batch_size: int) -> np.ndarray:
+def embed(texts: np.ndarray, model: nn.Module, batch_size: int, device: torch.device) -> np.ndarray:
     model.eval()
     idx = 0
     cnt = texts.shape[0]
@@ -61,9 +61,9 @@ def embed(texts: np.ndarray, model: nn.Module, batch_size: int) -> np.ndarray:
         if batch_idx in checkpoints:
             print(f"processed {(batch_idx / batches) * 100} % batches")
         batch = texts[idx:idx + batch_size, :]
-        batch_tensor = torch.from_numpy(batch)
+        batch_tensor = torch.from_numpy(batch).to(device)
         with torch.no_grad():
-            text_embedded = model(batch_tensor).detach().numpy()
+            text_embedded = model(batch_tensor).detach().numpy().to('cpu')
         embeddings.append(text_embedded)
         idx += batch_size
         batch_idx += 1
@@ -148,13 +148,14 @@ def write_embeddings(logdir_path: str, candidates: Dict[int, Dict], candidate_em
 def calculate_recall(query_results: np.ndarray, queries: List[Dict],
                      candidates_by_product_id: Dict[str, Dict]) -> float:
     recalls = []
+    missing_counter = 0
 
     for idx, query_result in enumerate(query_results.tolist()):
         relevant_candidate_ids = queries[idx]["relevant_product_ids"]
         relevant_aux_ids = []
         for relevant_candidate_id in relevant_candidate_ids:
             if relevant_candidate_id not in candidates_by_product_id:
-                print(f"{relevant_candidate_id} not in candidates set, skipping")
+                missing_counter +=1
                 continue
             else:
                 relevant_aux_ids.append(candidates_by_product_id[relevant_candidate_id])
@@ -163,6 +164,7 @@ def calculate_recall(query_results: np.ndarray, queries: List[Dict],
             num_found = len(intersection)
             recall = num_found / len(relevant_aux_ids)
             recalls.append(recall)
+    print(f"Number of candidates not found during recall validation: {missing_counter}")
     recall = np.mean(np.array(recalls))
     return recall
 
@@ -207,6 +209,7 @@ def recall_validation(
         similarity_metric: SimilarityMetric,
         k: int,
         model: nn.Module,
+        device: torch.device,
         visualize_path: Optional[str] = None
 ):
     index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
@@ -247,7 +250,8 @@ class RecallValidator:
                  embedding_batch_size: int,
                  query_batch_size: int,
                  similarity_metric: SimilarityMetric,
-                 k: int
+                 k: int,
+                 device: torch.device
                  ):
         self.candidates_path = candidates_path
         self.queries_path = queries_path
@@ -258,6 +262,7 @@ class RecallValidator:
         self.query_batch_size = query_batch_size
         self.similarity_metric = similarity_metric
         self.k = k
+        self.device = device
 
     def validate(self, model: nn.Module):
         return recall_validation(
@@ -270,7 +275,8 @@ class RecallValidator:
             model=model,
             embedding_batch_size=self.embedding_batch_size,
             k=self.k,
-            query_batch_size=self.query_batch_size
+            query_batch_size=self.query_batch_size,
+            device=self.device
         )
 
 
