@@ -63,7 +63,7 @@ def embed(texts: np.ndarray, model: nn.Module, batch_size: int, device: torch.de
         batch = texts[idx:idx + batch_size, :]
         batch_tensor = torch.from_numpy(batch).to(device)
         with torch.no_grad():
-            text_embedded = model(batch_tensor).detach().numpy().to('cpu')
+            text_embedded = model(batch_tensor).detach().cpu().numpy()
         embeddings.append(text_embedded)
         idx += batch_size
         batch_idx += 1
@@ -120,14 +120,14 @@ def search(embeddings: np.ndarray, batch_size: int, similarity_metric: Similarit
 
 
 def candidates_index(candidates_path: str, num_embeddings: int, embedding_dim: int, text_max_length: int,
-                     embedding_batch_size: int, similarity_metric: SimilarityMetric, model: nn.Module):
+                     embedding_batch_size: int, similarity_metric: SimilarityMetric, model: nn.Module, device: torch.device):
     candidates = load_candidates(candidates_path)
     candidates_by_product_id = {v["product_id"]: k for k, v in candidates.items()}
     print("Loaded candidates")
     candidates_vectorized = vectorize([c["product_name"] for c in candidates.values()], num_embeddings=num_embeddings,
                                       text_max_length=text_max_length)
     print("Vectorized candidates")
-    candidate_embeddings = embed(candidates_vectorized, model, batch_size=embedding_batch_size)
+    candidate_embeddings = embed(candidates_vectorized, model, batch_size=embedding_batch_size, device=device)
     print("Embedded candidates")
     index = create_index(embedding_dim, candidate_embeddings, similarity_metric)
     print("Created candidates index")
@@ -177,7 +177,8 @@ def interactive_search(candidates_path: str,
                        query_batch_size: int,
                        similarity_metric: SimilarityMetric,
                        k: int,
-                       model: nn.Module):
+                       model: nn.Module,
+                       device: torch.device):
     index, candidates_by_product_id, candidates, _ = candidates_index(
         candidates_path=candidates_path,
         num_embeddings=num_embeddings,
@@ -185,13 +186,14 @@ def interactive_search(candidates_path: str,
         text_max_length=text_max_length,
         embedding_batch_size=embedding_batch_size,
         similarity_metric=similarity_metric,
-        model=model
+        model=model,
+        device=device
     )
 
     while True:
         query = input("Type your query: \n")
         query_vectorized = vectorize([query], num_embeddings=num_embeddings, text_max_length=text_max_length)
-        query_embeddings = embed(query_vectorized, model, batch_size=embedding_batch_size)
+        query_embeddings = embed(query_vectorized, model, batch_size=embedding_batch_size, device=device)
         query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
         for query_result in query_results.tolist():
             for result_idx, result in enumerate(query_result):
@@ -219,7 +221,8 @@ def recall_validation(
         text_max_length=text_max_length,
         embedding_batch_size=embedding_batch_size,
         similarity_metric=similarity_metric,
-        model=model
+        model=model,
+        device=device
     )
 
     queries = load_queries(queries_path)
@@ -227,7 +230,7 @@ def recall_validation(
     queries_vectorized = vectorize([q["query_search_phrase"] for q in queries], num_embeddings=num_embeddings,
                                    text_max_length=text_max_length)
     print("Vectorized queries")
-    query_embeddings = embed(queries_vectorized, model, batch_size=embedding_batch_size)
+    query_embeddings = embed(queries_vectorized, model, batch_size=embedding_batch_size, device=device)
     print("Embedded queries")
     query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
     print("Executed queries")
