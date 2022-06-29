@@ -34,6 +34,7 @@ def train(
         recall_validator: Optional[RecallValidator] = None
 ):
     for epoch in range(epoch_start, n_epochs):
+        model.to(device)
         model.train()
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
@@ -62,6 +63,7 @@ def train(
         tensorboard_writer.add_scalar("AverageLoss/train", average_loss, epoch)
         tensorboard_writer.add_scalar("AverageLoss/valid", validation_average_loss, epoch)
 
+        model.to('cpu')
         if recall_validator:
             print("Starting recall validation")
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'

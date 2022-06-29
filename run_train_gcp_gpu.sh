@@ -16,18 +16,19 @@ PYTHON_MODULE="qdrl.main_train"
 WORKING_DIRECTORY="."
 
 #machine spec
-MACHINE_TYPE="n1-standard-8"
+MACHINE_TYPE="n1-standard-4"
 REPLICA_COUNT=1
 GPU_CARD="NVIDIA_TESLA_P4"
 GPU_COUNT=1
 
 #job arguments
-TASK_ID="recall_validation"
+TASK_ID="recall_validation_huge_dataset"
 NUM_EPOCHS=10
-RUN_ID="run_2_batch_size_32"
+RUN_ID="run_1_batch_size_32"
 BATCH_SIZE=32
 LEARNING_RATE=1e-2
 DATALOADER_WORKERS=4
+DATASET_SUBDIR="dataset_20220425-20220627"
 
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
 COMMIT_HASH=$(git rev-parse --short HEAD)
@@ -38,10 +39,7 @@ if [[ -z "${BUCKET}" ]]; then
 else
   BASE_DIR="/gcs/${BUCKET}"
   TASK_DIR="${BASE_DIR}/training/${TASK_ID}"
-  TRAINING_DATA_DIR="${BASE_DIR}/dataset_v1/"
-  VALIDATION_DATA_DIR="${BASE_DIR}/evaluation_dataset_v1/"
-  RECALL_VALIDATION_CANDIDATES_PATH="${BASE_DIR}/recall_evaluation_dataset/candidates/chunk-000000000000.json"
-  RECALL_VALIDATION_QUERIES_PATH="${BASE_DIR}/recall_evaluation_dataset/queries/chunk-000000000000.json"
+  DATASET_DIR="${BASE_DIR}/${DATASET_SUBDIR}/"
 fi
 
 # TODO: remove this. Using prebuild image until pushing to eu gcr is possible
@@ -56,10 +54,7 @@ fi
 echo "staring training job with args"
 echo "TASK_ID: $TASK_ID"
 echo "TASK_DIR: $TASK_DIR"
-echo "TRAINING_DATA_DIR: $TRAINING_DATA_DIR"
-echo "VALIDATION_DATA_DIR: $VALIDATION_DATA_DIR"
-echo "RECALL_VALIDATION_QUERIES_PATH: $RECALL_VALIDATION_QUERIES_PATH"
-echo "RECALL_VALIDATION_CANDIDATES_PATH: $RECALL_VALIDATION_CANDIDATES_PATH"
+echo "DATASET_DIR": "$DATASET_DIR"
 echo "CONTAINER_IMAGE_URI: $CONTAINER_IMAGE_URI"
 echo "DISPLAY_NAME: $DISPLAY_NAME"
 echo "COMMIT_HASH: $COMMIT_HASH"
@@ -69,5 +64,5 @@ gcloud ai custom-jobs create \
   --region=${REGION} \
   --display-name=${DISPLAY_NAME} \
   --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},container-image-uri=${CONTAINER_IMAGE_URI},accelerator-type=${GPU_CARD},accelerator-count=${GPU_COUNT} \
-  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--training-data-dir=${TRAINING_DATA_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--validation-data-dir=${VALIDATION_DATA_DIR},--dataloader-workers=${DATALOADER_WORKERS},--recall-validation-candidates-path=${RECALL_VALIDATION_CANDIDATES_PATH},--recall-validation-queries-path=${RECALL_VALIDATION_QUERIES_PATH},--validate-recall
+  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--dataset-dir=${$DATASET_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--dataloader-workers=${DATALOADER_WORKERS},--validate-recall
 #  #  --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},executor-image-uri=${EXECUTOR_IMAGE_URI},local-package-path=${WORKING_DIRECTORY},python-module=${PYTHON_MODULE} \
