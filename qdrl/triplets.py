@@ -3,7 +3,7 @@ from typing import Tuple, List
 
 import torch
 from torch import nn
-from torch.cuda.amp import autocast
+# from torch.cuda.amp import autocast
 
 
 class TripletAssembler(abc.ABC):
@@ -32,9 +32,9 @@ class BatchNegativeTripletsAssembler(TripletAssembler):
                                 torch.tensor,
                                 torch.tensor]:
         anchor, positive = batch[0].to(device), batch[1].to(device)
-        with autocast():
-            anchor_out = model(anchor)
-            positive_out = model(positive)
+        # with autocast():
+        anchor_out = model(anchor)
+        positive_out = model(positive)
 
         anchor = anchor_out[self.anchor_mask]
         positive = positive_out[self.positive_mask]
