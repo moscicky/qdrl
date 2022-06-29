@@ -22,13 +22,13 @@ GPU_CARD="NVIDIA_TESLA_P4"
 GPU_COUNT=1
 
 #job arguments
-TASK_ID="recall_validation_small_dataset_remove_autocast_add_recall"
-NUM_EPOCHS=10
+TASK_ID="recall_validation_dataset_20220425-20220627_run_1_batch_size_32"
+NUM_EPOCHS=6
 RUN_ID="run_1_batch_size_32"
 BATCH_SIZE=32
 LEARNING_RATE=1e-2
 DATALOADER_WORKERS=4
-DATASET_SUBDIR="dataset_small"
+DATASET_SUBDIR="dataset_20220425-20220627"
 
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}_$(date +'%Y_%m_%dT%H_%M')"
 COMMIT_HASH=$(git rev-parse --short HEAD)
