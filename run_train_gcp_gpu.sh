@@ -22,7 +22,7 @@ GPU_CARD="NVIDIA_TESLA_P4"
 GPU_COUNT=1
 
 #job arguments
-TASK_ID="recall_validation_small_dataset_nan_revert_print_device"
+TASK_ID="recall_validation_small_dataset_nan_check"
 NUM_EPOCHS=10
 RUN_ID="run_1_batch_size_32"
 BATCH_SIZE=32
