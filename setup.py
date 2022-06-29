@@ -7,7 +7,7 @@ install_requirements = [
     "pandas==1.0.5",
     "tensorboard==2.9.0",
     "protobuf==3.20.1",
-    "faiss-cpu==1.7.2"
+    # "faiss-cpu==1.7.2"
 ]
 
 test_requirements = [

@@ -15,7 +15,7 @@ from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_validator import LossValidator
 from qdrl.models import SimpleTextEncoder
-from qdrl.recall_validator import RecallValidator
+# from qdrl.recall_validator import RecallValidator
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
 
@@ -31,7 +31,7 @@ def train(
         triplet_assembler: TripletAssembler,
         tensorboard_writer: SummaryWriter,
         loss_validator: LossValidator,
-        recall_validator: Optional[RecallValidator] = None
+        # recall_validator: Optional[RecallValidator] = None
 ):
     for epoch in range(epoch_start, n_epochs):
         model.train()
@@ -62,11 +62,11 @@ def train(
         tensorboard_writer.add_scalar("AverageLoss/train", average_loss, epoch)
         tensorboard_writer.add_scalar("AverageLoss/valid", validation_average_loss, epoch)
 
-        if recall_validator:
-            print("Starting recall validation")
-            os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-            recall = recall_validator.validate(model)
-            tensorboard_writer.add_scalar("Recall/valid", recall, epoch)
+        # if recall_validator:
+        #     print("Starting recall validation")
+        #     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
+        #     recall = recall_validator.validate(model)
+        #     tensorboard_writer.add_scalar("Recall/valid", recall, epoch)
 
 
 def init_directories(paths: List[str]):
@@ -168,18 +168,18 @@ def main(
         device=device
     )
 
-    recall_validator = RecallValidator(
-        candidates_path=os.path.join(dataset_dir, "recall_validation_items_dataset", "items.json"),
-        queries_path=os.path.join(dataset_dir, "recall_validation_queries_dataset", "queries.json"),
-        num_embeddings=NUM_EMBEDDINGS,
-        text_max_length=TEXT_MAX_LENGTH,
-        embedding_dim=FC_DIM,
-        similarity_metric=SimilarityMetric.COSINE,
-        embedding_batch_size=4096,
-        k=1024,
-        query_batch_size=128,
-        device=device
-    )
+    # recall_validator = RecallValidator(
+    #     candidates_path=os.path.join(dataset_dir, "recall_validation_items_dataset", "items.json"),
+    #     queries_path=os.path.join(dataset_dir, "recall_validation_queries_dataset", "queries.json"),
+    #     num_embeddings=NUM_EMBEDDINGS,
+    #     text_max_length=TEXT_MAX_LENGTH,
+    #     embedding_dim=FC_DIM,
+    #     similarity_metric=SimilarityMetric.COSINE,
+    #     embedding_batch_size=4096,
+    #     k=1024,
+    #     query_batch_size=128,
+    #     device=device
+    # )
 
     train(
         device=device,
@@ -193,7 +193,7 @@ def main(
         triplet_assembler=triplet_assembler,
         tensorboard_writer=tensorboard_writer,
         loss_validator=validator,
-        recall_validator=recall_validator if args.validate_recall else None
+        # recall_validator=recall_validator if args.validate_recall else None
     )
     print("Training finished, saving the model from last epoch...")
 
