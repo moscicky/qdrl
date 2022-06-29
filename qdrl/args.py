@@ -29,21 +29,9 @@ def get_args():
     )
 
     args_parser.add_argument(
-        '--training-data-dir',
+        '--dataset-dir',
         type=str,
         required=True,
-    )
-
-    args_parser.add_argument(
-        '--validation-data-dir',
-        type=str,
-        required=True,
-    )
-
-    args_parser.add_argument(
-        '--training-data-file',
-        type=str,
-        default=None
     )
 
     args_parser.add_argument(
@@ -69,18 +57,6 @@ def get_args():
         '--dataloader-workers',
         type=int,
         required=True
-    )
-
-    args_parser.add_argument(
-        '--recall-validation-candidates-path',
-        type=str,
-        default=None
-    )
-
-    args_parser.add_argument(
-        '--recall-validation-queries-path',
-        type=str,
-        default=None
     )
 
     args_parser.add_argument(

@@ -30,7 +30,7 @@ class TripletsDataset(Dataset):
     @staticmethod
     def _read_csv(path: str) -> pd.DataFrame:
         with open(path, "rb") as f:
-            df = pd.read_csv(f, sep=",", error_bad_lines=False, warn_bad_lines=True)
+            df = pd.read_json(f, lines=True)
             return df
 
 
@@ -56,7 +56,7 @@ class LazyTextDataset(IterableDataset):
     def _read_csv(path: str, cols: List[str]) -> pd.DataFrame:
         try:
             with open(path, "rb") as f:
-                df = pd.read_csv(f, sep=",", usecols=cols)
+                df = pd.read_json(f, lines=True)
                 return df
         except Exception as e:
             print(f"Failed to load file: {path}, error: {e}, skipping")

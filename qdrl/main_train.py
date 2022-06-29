@@ -15,7 +15,7 @@ from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_validator import LossValidator
 from qdrl.models import SimpleTextEncoder
-from qdrl.recall_validator import recall_validation, RecallValidator
+from qdrl.recall_validator import RecallValidator
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
 
@@ -105,8 +105,7 @@ def main(
         batch_size: int,
         learning_rate: float,
         reuse_epoch: bool,
-        training_data_dir: str,
-        validation_data_dir: str,
+        dataset_dir: str,
         meta: Dict,
         dataloader_workers: int
 ):
@@ -120,8 +119,8 @@ def main(
 
     dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
                                  max_length=TEXT_MAX_LENGTH)
-    training_dataset = dataset_fn(training_data_dir)
-    validation_dataset = dataset_fn(validation_data_dir)
+    training_dataset = dataset_fn(os.path.join(dataset_dir, "training_dataset"))
+    validation_dataset = dataset_fn(os.path.join(dataset_dir, "validation_dataset"))
 
     triplet_assembler = BatchNegativeTripletsAssembler(batch_size=batch_size, negatives_count=batch_size - 1)
     training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=dataloader_workers, drop_last=True)
@@ -170,8 +169,8 @@ def main(
     )
 
     recall_validator = RecallValidator(
-        candidates_path=args.recall_validation_candidates_path,
-        queries_path=args.recall_validation_queries_path,
+        candidates_path=os.path.join(dataset_dir, "recall_validation_items_dataset", "items.json"),
+        queries_path=os.path.join(dataset_dir, "recall_validation_queries_dataset", "queries.json"),
         num_embeddings=NUM_EMBEDDINGS,
         text_max_length=TEXT_MAX_LENGTH,
         embedding_dim=FC_DIM,
@@ -215,10 +214,9 @@ if __name__ == '__main__':
         task_id=args.task_id,
         run_id=args.run_id,
         batch_size=args.batch_size,
-        training_data_dir=args.training_data_dir,
+        dataset_dir=args.dataset_dir,
         learning_rate=args.learning_rate,
         reuse_epoch=args.reuse_epoch,
-        validation_data_dir=args.validation_data_dir,
         meta=vars(args),
         dataloader_workers=args.dataloader_workers
     )
