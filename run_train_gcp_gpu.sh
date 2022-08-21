@@ -22,7 +22,7 @@ GPU_CARD="NVIDIA_TESLA_P4"
 GPU_COUNT=1
 
 #job arguments
-TASK_ID="recall_validation_dataset_20220425-20220627_run_1_batch_size_32"
+TASK_ID="recall_validation_fixed_dataset_20220425-20220627"
 NUM_EPOCHS=6
 RUN_ID="run_1_batch_size_32"
 BATCH_SIZE=32
