@@ -48,8 +48,8 @@ class LazyTextDataset(IterableDataset):
     def prepare_dataset(self) -> pd.DataFrame:
         print(f"Reading dataset: {self.path}")
         df = self._read_csv(self.path, self.cols).astype('str')
-        df_transformed = df.applymap(
-            lambda c: vectorize_word(clean_phrase(c), num_features=self.num_features, max_length=self.max_length))
+        df_cleaned = df.applymap(lambda c: clean_phrase(c))
+        df_transformed = df_cleaned.applymap(lambda c: vectorize_word(c, num_features=self.num_features, max_length=self.max_length))
         return df_transformed
 
     @staticmethod
@@ -57,7 +57,7 @@ class LazyTextDataset(IterableDataset):
         try:
             with open(path, "rb") as f:
                 df = pd.read_json(f, lines=True)
-                return df
+                return df[cols]
         except Exception as e:
             print(f"Failed to load file: {path}, error: {e}, skipping")
             return pd.DataFrame(columns=cols)
