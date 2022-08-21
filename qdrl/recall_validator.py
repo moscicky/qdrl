@@ -286,8 +286,8 @@ class RecallValidator:
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
     model_path = 'models/model.pth'
-    candidates_path = 'datasets/dataset_small/recall_validation_items_dataset/items.json'
-    queries_path = 'datasets/dataset_small/recall_validation_queries_dataset/queries.json'
+    candidates_path = 'datasets/dataset/recall_validation_items_dataset/items.json'
+    queries_path = 'datasets/dataset/recall_validation_queries_dataset/queries.json'
 
     model_config = ModelConfig(num_embeddings=50000, embedding_dim=128)
 

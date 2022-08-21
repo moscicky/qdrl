@@ -33,6 +33,8 @@ def train(
         loss_validator: LossValidator,
         recall_validator: Optional[RecallValidator] = None
 ):
+    batch_idx = 0
+
     for epoch in range(epoch_start, n_epochs):
         model.train()
         epoch_loss = 0.0
@@ -52,7 +54,7 @@ def train(
 
         save_checkpoint(epoch, checkpoints_path, model, optimizer)
 
-        average_loss = epoch_loss / batch_idx
+        average_loss = epoch_loss / (batch_idx if batch_idx else 1)
         print(f"Finished training epoch: {epoch}, total loss: {epoch_loss}, average loss: {average_loss}")
 
         validation_total_loss, validation_average_loss = loss_validator.validate(model, epoch)

@@ -4,7 +4,7 @@ PYTHON_MODULE="qdrl.main_train"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M-%S')"
 #RUN_ID="..."
 
-TASK_ID="chunked_dataset"
+TASK_ID="recall_validation_fixed"
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}"
 EXTRA_DIRS="datasets,bucket"
 LEARNING_RATE=1e-2
@@ -33,7 +33,7 @@ gcloud ai custom-jobs local-run \
   --num-epochs=1 \
   --dataset-dir=datasets/dataset \
   --commit-hash=$COMMIT_HASH \
-  --batch-size=64 \
+  --batch-size=32 \
   --learning-rate=${LEARNING_RATE} \
   --reuse-epoch \
   --dataloader-workers=4 \
