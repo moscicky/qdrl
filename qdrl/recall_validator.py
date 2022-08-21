@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from qdrl.configs import SimilarityMetric, ModelConfig
 from qdrl.models import SimpleTextEncoder
-from qdrl.preprocess import vectorize_word, clean_phrase
+from qdrl.preprocess import clean_phrase, TextVectorizer, WordUnigramVectorizer
 
 
 def prepare_model(
@@ -33,18 +33,16 @@ def load_candidates(candidates_path: str) -> Dict[int, Dict]:
     return candidates
 
 
-def vectorize_text(text: str, num_embeddings: int, text_max_length) -> List[int]:
-    return vectorize_word(clean_phrase(text), num_features=num_embeddings,
-                          max_length=text_max_length)
+def vectorize_text(vectorizer: TextVectorizer, text: str) -> List[int]:
+    return vectorizer.vectorize(clean_phrase(text))
 
 
 def vectorize(texts: List[str],
-              num_embeddings: int,
-              text_max_length: int) -> np.ndarray:
+              vectorizer: TextVectorizer) -> np.ndarray:
     vectorized = []
     for text in texts:
         vectorized.append(
-            np.array(vectorize_text(text, num_embeddings, text_max_length), dtype=np.int32))
+            np.array(vectorize_text(vectorizer, text), dtype=np.int32))
     return np.array(vectorized)
 
 
@@ -119,13 +117,13 @@ def search(embeddings: np.ndarray, batch_size: int, similarity_metric: Similarit
     return np.vstack(query_results)
 
 
-def candidates_index(candidates_path: str, num_embeddings: int, embedding_dim: int, text_max_length: int,
-                     embedding_batch_size: int, similarity_metric: SimilarityMetric, model: nn.Module, device: torch.device):
+def candidates_index(candidates_path: str, vectorizer: TextVectorizer, embedding_dim: int,
+                     embedding_batch_size: int, similarity_metric: SimilarityMetric, model: nn.Module,
+                     device: torch.device):
     candidates = load_candidates(candidates_path)
     candidates_by_product_id = {v["product_id"]: k for k, v in candidates.items()}
     print("Loaded candidates")
-    candidates_vectorized = vectorize([c["product_name"] for c in candidates.values()], num_embeddings=num_embeddings,
-                                      text_max_length=text_max_length)
+    candidates_vectorized = vectorize([c["product_name"] for c in candidates.values()], vectorizer)
     print("Vectorized candidates")
     candidate_embeddings = embed(candidates_vectorized, model, batch_size=embedding_batch_size, device=device)
     print("Embedded candidates")
@@ -155,7 +153,7 @@ def calculate_recall(query_results: np.ndarray, queries: List[Dict],
         relevant_aux_ids = []
         for relevant_candidate_id in relevant_candidate_ids:
             if relevant_candidate_id not in candidates_by_product_id:
-                missing_counter +=1
+                missing_counter += 1
                 continue
             else:
                 relevant_aux_ids.append(candidates_by_product_id[relevant_candidate_id])
@@ -170,8 +168,8 @@ def calculate_recall(query_results: np.ndarray, queries: List[Dict],
 
 
 def interactive_search(candidates_path: str,
+                       vectorizer: TextVectorizer,
                        num_embeddings: int,
-                       text_max_length: int,
                        embedding_dim: int,
                        embedding_batch_size: int,
                        query_batch_size: int,
@@ -181,9 +179,8 @@ def interactive_search(candidates_path: str,
                        device: torch.device):
     index, candidates_by_product_id, candidates, _ = candidates_index(
         candidates_path=candidates_path,
-        num_embeddings=num_embeddings,
+        vectorizer=vectorizer,
         embedding_dim=embedding_dim,
-        text_max_length=text_max_length,
         embedding_batch_size=embedding_batch_size,
         similarity_metric=similarity_metric,
         model=model,
@@ -192,7 +189,7 @@ def interactive_search(candidates_path: str,
 
     while True:
         query = input("Type your query: \n")
-        query_vectorized = vectorize([query], num_embeddings=num_embeddings, text_max_length=text_max_length)
+        query_vectorized = vectorize([query], vectorizer)
         query_embeddings = embed(query_vectorized, model, batch_size=embedding_batch_size, device=device)
         query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
         for query_result in query_results.tolist():
@@ -203,8 +200,7 @@ def interactive_search(candidates_path: str,
 def recall_validation(
         candidates_path: str,
         queries_path: str,
-        num_embeddings: int,
-        text_max_length: int,
+        vectorizer: TextVectorizer,
         embedding_dim: int,
         embedding_batch_size: int,
         query_batch_size: int,
@@ -216,9 +212,8 @@ def recall_validation(
 ):
     index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
         candidates_path=candidates_path,
-        num_embeddings=num_embeddings,
+        vectorizer=vectorizer,
         embedding_dim=embedding_dim,
-        text_max_length=text_max_length,
         embedding_batch_size=embedding_batch_size,
         similarity_metric=similarity_metric,
         model=model,
@@ -227,8 +222,7 @@ def recall_validation(
 
     queries = load_queries(queries_path)
     print("Loaded queries")
-    queries_vectorized = vectorize([q["query_search_phrase"] for q in queries], num_embeddings=num_embeddings,
-                                   text_max_length=text_max_length)
+    queries_vectorized = vectorize([q["query_search_phrase"] for q in queries], vectorizer)
     print("Vectorized queries")
     query_embeddings = embed(queries_vectorized, model, batch_size=embedding_batch_size, device=device)
     print("Embedded queries")
@@ -247,8 +241,7 @@ class RecallValidator:
     def __init__(self,
                  candidates_path: str,
                  queries_path: str,
-                 num_embeddings: int,
-                 text_max_length: int,
+                 vectorizer: TextVectorizer,
                  embedding_dim: int,
                  embedding_batch_size: int,
                  query_batch_size: int,
@@ -258,28 +251,26 @@ class RecallValidator:
                  ):
         self.candidates_path = candidates_path
         self.queries_path = queries_path
-        self.num_embeddings = num_embeddings
-        self.text_max_length = text_max_length
         self.embedding_dim = embedding_dim
         self.embedding_batch_size = embedding_batch_size
         self.query_batch_size = query_batch_size
         self.similarity_metric = similarity_metric
         self.k = k
         self.device = device
+        self.vectorizer = vectorizer
 
     def validate(self, model: nn.Module):
         return recall_validation(
             candidates_path=self.candidates_path,
             queries_path=self.queries_path,
-            num_embeddings=self.num_embeddings,
-            text_max_length=self.text_max_length,
             embedding_dim=self.embedding_dim,
             similarity_metric=self.similarity_metric,
             model=model,
             embedding_batch_size=self.embedding_batch_size,
             k=self.k,
             query_batch_size=self.query_batch_size,
-            device=self.device
+            device=self.device,
+            vectorizer=self.vectorizer
         )
 
 
@@ -291,12 +282,13 @@ if __name__ == '__main__':
 
     model_config = ModelConfig(num_embeddings=50000, embedding_dim=128)
 
+    vectorizer = WordUnigramVectorizer(num_features=model_config.num_embeddings, max_length=10)
+
     model = prepare_model(model_config, model_path)
 
     recall_validation(candidates_path,
                       queries_path,
-                      num_embeddings=model_config.num_embeddings,
-                      text_max_length=10,
+                      vectorizer=vectorizer,
                       embedding_dim=128,
                       similarity_metric=SimilarityMetric.COSINE,
                       model=model,

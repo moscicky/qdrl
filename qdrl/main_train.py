@@ -15,6 +15,7 @@ from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_validator import LossValidator
 from qdrl.models import SimpleTextEncoder
+from qdrl.preprocess import TextVectorizer, WordUnigramVectorizer
 from qdrl.recall_validator import RecallValidator
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
@@ -96,8 +97,8 @@ NUM_EMBEDDINGS = 50000
 TEXT_MAX_LENGTH = 10
 
 
-def dataset_factory(cols: List[str], num_features: int, max_length: int) -> Callable[[str], ChunkingDataset]:
-    return lambda p: ChunkingDataset(p, cols=cols, num_features=num_features, max_length=max_length)
+def dataset_factory(cols: List[str], vectorizer: TextVectorizer) -> Callable[[str], ChunkingDataset]:
+    return lambda p: ChunkingDataset(p, cols=cols, vectorizer=vectorizer)
 
 
 def main(
@@ -119,14 +120,17 @@ def main(
     model_output_path = os.path.join(model_output_dir_path, "model_weights.pth")
     checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
 
-    dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], num_features=NUM_EMBEDDINGS,
-                                 max_length=TEXT_MAX_LENGTH)
+    vectorizer = WordUnigramVectorizer(num_features=NUM_EMBEDDINGS, max_length=TEXT_MAX_LENGTH)
+
+    dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], vectorizer=vectorizer)
     training_dataset = dataset_fn(os.path.join(dataset_dir, "training_dataset"))
     validation_dataset = dataset_fn(os.path.join(dataset_dir, "validation_dataset"))
 
     triplet_assembler = BatchNegativeTripletsAssembler(batch_size=batch_size, negatives_count=batch_size - 1)
-    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=dataloader_workers, drop_last=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=dataloader_workers, drop_last=True)
+    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=dataloader_workers,
+                                     drop_last=True)
+    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=dataloader_workers,
+                                       drop_last=True)
 
     layout = {
         "metrics": {
@@ -173,8 +177,7 @@ def main(
     recall_validator = RecallValidator(
         candidates_path=os.path.join(dataset_dir, "recall_validation_items_dataset", "items.json"),
         queries_path=os.path.join(dataset_dir, "recall_validation_queries_dataset", "queries.json"),
-        num_embeddings=NUM_EMBEDDINGS,
-        text_max_length=TEXT_MAX_LENGTH,
+        vectorizer=vectorizer,
         embedding_dim=FC_DIM,
         similarity_metric=SimilarityMetric.COSINE,
         embedding_batch_size=4096,
@@ -205,7 +208,7 @@ def main(
     torch.save(model.state_dict(), model_output_path)
     print("Model saved successfully, exiting...")
 
-
+# --num-epochs 1 --task-id test --run-id 1 --dataset-dir datasets/dataset --commit-hash abc --learning-rate 1e-2 --batch-size 32 --dataloader-workers 2
 if __name__ == '__main__':
     args = get_args()
     print(f"Starting training job with args: {args}")
