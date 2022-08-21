@@ -285,9 +285,9 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    model_path = 'bucket/models/chunked_dataset_run_3_models_model_weights.pth'
-    candidates_path = 'datasets/recall_evaluation_dataset/candidates/candidates.json'
-    queries_path = 'datasets/recall_evaluation_dataset/queries/queries.json'
+    model_path = 'models/model.pth'
+    candidates_path = 'datasets/dataset_small/recall_validation_items_dataset/items.json'
+    queries_path = 'datasets/dataset_small/recall_validation_queries_dataset/queries.json'
 
     model_config = ModelConfig(num_embeddings=50000, embedding_dim=128)
 
@@ -303,7 +303,8 @@ if __name__ == '__main__':
                       embedding_batch_size=4096,
                       k=1024,
                       query_batch_size=128,
-                      visualize_path="tensorboard/embeddings"
+                      visualize_path="tensorboard/embeddings",
+                      device=torch.device("cpu")
                       )
 
     # interactive_search(
@@ -315,5 +316,6 @@ if __name__ == '__main__':
     #     model=model,
     #     embedding_batch_size=4096,
     #     k=30,
-    #     query_batch_size=128
+    #     query_batch_size=128,
+    #     device=torch.device("cpu")
     # )

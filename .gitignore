@@ -6,3 +6,4 @@ test-reports
 
 datasets/*
 bucket/*
+models/*
