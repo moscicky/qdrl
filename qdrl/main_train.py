@@ -14,7 +14,7 @@ from qdrl.checkpoints import save_checkpoint
 from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_validator import LossValidator
-from qdrl.models import SimpleTextEncoder
+from qdrl.models import SimpleTextEncoder, RegularizedSimpleTextEncoder
 from qdrl.preprocess import TextVectorizer, WordUnigramVectorizer
 from qdrl.recall_validator import RecallValidator
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
@@ -143,7 +143,7 @@ def main(
 
     tensorboard_writer.add_custom_scalars(layout)
 
-    model = SimpleTextEncoder(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM, fc_dim=FC_DIM,
+    model = RegularizedSimpleTextEncoder(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM, fc_dim=FC_DIM,
                               output_dim=FC_DIM)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
