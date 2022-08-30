@@ -93,7 +93,7 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
 
 EMBEDDING_DIM = 256
 FC_DIM = 128
-NUM_EMBEDDINGS = 50000
+NUM_EMBEDDINGS = 150000
 TEXT_MAX_LENGTH = 10
 
 
@@ -143,7 +143,7 @@ def main(
 
     tensorboard_writer.add_custom_scalars(layout)
 
-    model = RegularizedSimpleTextEncoder(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM, fc_dim=FC_DIM,
+    model = SimpleTextEncoder(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM, fc_dim=FC_DIM,
                               output_dim=FC_DIM)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
