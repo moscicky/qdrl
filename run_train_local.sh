@@ -1,10 +1,10 @@
-EXECUTOR_IMAGE_URI="europe-docker.pkg.dev/vertex-ai/training/pytorch-xla.1-11:latest"
+EXECUTOR_IMAGE_URI="europe-docker.pkg.dev/vertex-ai/training/pytorch-gpu.1-11:latest"
 WORKING_DIRECTORY="."
 PYTHON_MODULE="qdrl.main_train"
-RUN_ID="$(date +'%Y-%m-%d-%H-%M-%S')"
+RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
 #RUN_ID="..."
 
-TASK_ID="150k_embedding_dim"
+TASK_ID="4m_dataset"
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}"
 EXTRA_DIRS="datasets,bucket"
 LEARNING_RATE=1e-2
@@ -31,9 +31,9 @@ gcloud ai custom-jobs local-run \
   --task-id=$TASK_ID \
   --run-id=$RUN_ID \
   --num-epochs=1 \
-  --dataset-dir=datasets/dataset \
+  --dataset-dir=datasets/docker \
   --commit-hash=$COMMIT_HASH \
-  --batch-size=32 \
+  --batch-size=64 \
   --learning-rate=${LEARNING_RATE} \
   --reuse-epoch \
   --dataloader-workers=4 \
