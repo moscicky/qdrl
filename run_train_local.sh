@@ -4,10 +4,11 @@ PYTHON_MODULE="qdrl.main_train"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
 #RUN_ID="..."
 
-TASK_ID="4m_dataset"
+TASK_ID="4m_dataset_margin_05"
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}"
 EXTRA_DIRS="datasets,bucket"
 LEARNING_RATE=1e-2
+TRIPLET_LOSS_MARGIN=0.5
 
 # build image which will be pushed to gcr
 if [[ -z "${PROJECT}" ]]; then
@@ -37,4 +38,5 @@ gcloud ai custom-jobs local-run \
   --learning-rate=${LEARNING_RATE} \
   --reuse-epoch \
   --dataloader-workers=4 \
-  --validate-recall
+  --validate-recall \
+  --triplet-loss-margin=${TRIPLET_LOSS_MARGIN}

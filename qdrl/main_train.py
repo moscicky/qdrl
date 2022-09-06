@@ -110,7 +110,8 @@ def main(
         reuse_epoch: bool,
         dataset_dir: str,
         meta: Dict,
-        dataloader_workers: int
+        dataloader_workers: int,
+        triplet_loss_margin: float
 ):
     init_task_dir(task_id=task_id, run_id=run_id, meta=meta)
 
@@ -147,7 +148,7 @@ def main(
                               output_dim=FC_DIM)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y))
+    triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y), margin=triplet_loss_margin)
 
     epoch_start = 0
 
@@ -224,5 +225,6 @@ if __name__ == '__main__':
         learning_rate=args.learning_rate,
         reuse_epoch=args.reuse_epoch,
         meta=vars(args),
-        dataloader_workers=args.dataloader_workers
+        dataloader_workers=args.dataloader_workers,
+        triplet_loss_margin=args.triplet_loss_margin
     )

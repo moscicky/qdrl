@@ -27,6 +27,7 @@ NUM_EPOCHS=6
 RUN_ID="run_1_batch_size_64"
 BATCH_SIZE=64
 LEARNING_RATE=1e-2
+TRIPLET_LOSS_MARGIN=0.5
 DATALOADER_WORKERS=4
 DATASET_SUBDIR="dataset_20220425-20220831"
 
@@ -64,5 +65,5 @@ gcloud ai custom-jobs create \
   --region=${REGION} \
   --display-name=${DISPLAY_NAME} \
   --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},container-image-uri=${CONTAINER_IMAGE_URI},accelerator-type=${GPU_CARD},accelerator-count=${GPU_COUNT} \
-  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--dataset-dir=${DATASET_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--dataloader-workers=${DATALOADER_WORKERS},--validate-recall
+  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--dataset-dir=${DATASET_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--dataloader-workers=${DATALOADER_WORKERS},--validate-recall,--triplet-loss-margin=${TRIPLET_LOSS_MARGIN}
 #  #  --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},executor-image-uri=${EXECUTOR_IMAGE_URI},local-package-path=${WORKING_DIRECTORY},python-module=${PYTHON_MODULE} \

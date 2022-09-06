@@ -65,4 +65,10 @@ def get_args():
         default=False,
     )
 
+    args_parser.add_argument(
+        '--triplet-loss-margin',
+        type=float,
+        default=1.0
+    )
+
     return args_parser.parse_args()
