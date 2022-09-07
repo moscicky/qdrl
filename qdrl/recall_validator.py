@@ -15,10 +15,13 @@ from qdrl.preprocess import clean_phrase, TextVectorizer, WordUnigramVectorizer
 
 def prepare_model(
         model_config: ModelConfig,
-        model_path: str
+        model_path: str,
+        from_checkpoint: bool = False
 ) -> nn.Module:
     model = SimpleTextEncoder(num_embeddings=model_config.num_embeddings, embedding_dim=256, fc_dim=128, output_dim=128)
-    model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
+    model_state = torch.load(model_path, map_location=torch.device('cpu'))[
+        "model_state_dict"] if from_checkpoint else torch.load(model_path, map_location=torch.device('cpu'))
+    model.load_state_dict(model_state)
     model.eval()
     return model
 
@@ -276,15 +279,15 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    model_path = 'models/model.pth'
-    candidates_path = 'datasets/dataset/recall_validation_items_dataset/items.json'
-    queries_path = 'datasets/dataset/recall_validation_queries_dataset/queries.json'
+    model_path = 'models/checkpoints/epoch2'
+    candidates_path = 'datasets/local/recall_validation_items_dataset/items.json'
+    queries_path = 'datasets/local/recall_validation_queries_dataset/queries.json'
 
-    model_config = ModelConfig(num_embeddings=50000, embedding_dim=128)
+    model_config = ModelConfig(num_embeddings=150000, embedding_dim=128)
 
     vectorizer = WordUnigramVectorizer(num_features=model_config.num_embeddings, max_length=10)
 
-    model = prepare_model(model_config, model_path)
+    model = prepare_model(model_config, model_path, from_checkpoint=True)
 
     recall_validation(candidates_path,
                       queries_path,
@@ -302,12 +305,12 @@ if __name__ == '__main__':
     # interactive_search(
     #     candidates_path,
     #     num_embeddings=model_config.num_embeddings,
-    #     text_max_length=10,
     #     embedding_dim=128,
     #     similarity_metric=SimilarityMetric.COSINE,
     #     model=model,
     #     embedding_batch_size=4096,
     #     k=30,
     #     query_batch_size=128,
-    #     device=torch.device("cpu")
+    #     device=torch.device("cpu"),
+    #     vectorizer=vectorizer
     # )
