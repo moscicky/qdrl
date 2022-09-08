@@ -7,3 +7,6 @@ test-reports
 datasets/*
 bucket/*
 models/*
+
+conifgs_remote/*
+configs_remote

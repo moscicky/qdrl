@@ -1,14 +1,11 @@
 EXECUTOR_IMAGE_URI="europe-docker.pkg.dev/vertex-ai/training/pytorch-gpu.1-11:latest"
 WORKING_DIRECTORY="."
 PYTHON_MODULE="qdrl.main_train"
+NAME="omega_conf_test"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
-#RUN_ID="..."
 
-TASK_ID="vectorizer_dictionary_100k_46k_16k"
-DISPLAY_NAME="${TASK_ID}_${RUN_ID}"
-EXTRA_DIRS="datasets,bucket"
-LEARNING_RATE=1e-2
-TRIPLET_LOSS_MARGIN=0.1
+DISPLAY_NAME="${NAME}_${RUN_ID}"
+EXTRA_DIRS="datasets,configs"
 
 # build image which will be pushed to gcr
 if [[ -z "${PROJECT}" ]]; then
@@ -29,15 +26,5 @@ gcloud ai custom-jobs local-run \
   --output-image-uri=$OUTPUT_IMAGE_URI \
   --extra-dirs=$EXTRA_DIRS \
   -- \
-  --task-id=$TASK_ID \
-  --run-id=$RUN_ID \
-  --num-epochs=1 \
-  --dataset-dir=datasets/docker \
-  --commit-hash=$COMMIT_HASH \
-  --batch-size=64 \
-  --learning-rate=${LEARNING_RATE} \
-  --reuse-epoch \
-  --dataloader-workers=4 \
-  --validate-recall \
-  --triplet-loss-margin=${TRIPLET_LOSS_MARGIN}\
-  --tokens-dictionary-path=datasets/docker/dictionary_100k_46k_16k
+  --config-file-path=configs/docker.yml \
+  --commit-hash=${COMMIT_HASH}

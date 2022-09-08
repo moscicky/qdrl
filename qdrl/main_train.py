@@ -1,8 +1,8 @@
-import json
 import os.path
-from typing import List, Dict, Callable, Optional
+from typing import List, Callable, Optional
 
 import torch
+from omegaconf import OmegaConf, DictConfig
 from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
@@ -14,8 +14,8 @@ from qdrl.checkpoints import save_checkpoint
 from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_validator import LossValidator
-from qdrl.models import SimpleTextEncoder, RegularizedSimpleTextEncoder
-from qdrl.preprocess import TextVectorizer, WordUnigramVectorizer, DictionaryLoaderTextVectorizer
+from qdrl.models import SimpleTextEncoder
+from qdrl.preprocess import TextVectorizer, DictionaryLoaderTextVectorizer
 from qdrl.recall_validator import RecallValidator
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
@@ -77,7 +77,7 @@ def init_directories(paths: List[str]):
         os.makedirs(path, exist_ok=True)
 
 
-def init_task_dir(task_id: str, run_id: str, meta: Dict):
+def init_task_dir(task_id: str, run_id: str, conf: DictConfig):
     if not os.path.isdir(task_id):
         print("Creating task directory...")
         init_directories([task_id])
@@ -86,62 +86,67 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
     if not os.path.isdir(run_id_path):
         print("Creating run directory")
         init_directories([run_id_path])
-        metadata_path = os.path.join(task_id, run_id, "metadata.json")
+        metadata_path = os.path.join(task_id, run_id, "config.yaml")
         with open(metadata_path, 'w') as mf:
-            json.dump(meta, mf)
-
-
-EMBEDDING_DIM = 256
-FC_DIM = 128
-NUM_OOV_TOKENS = 50000
-NUM_EMBEDDINGS = 150000 + 0 + 0 + NUM_OOV_TOKENS
-TEXT_MAX_LENGTH = 10
-WORD_UNIGRAMS_LIMIT = 8
-WORD_BIGRAMS_LIMIT = 0
-CHAR_TRIGRAMS_LIMIT = 0
+            OmegaConf.save(config=conf, f=mf)
 
 
 def dataset_factory(cols: List[str], vectorizer: TextVectorizer) -> Callable[[str], ChunkingDataset]:
     return lambda p: ChunkingDataset(p, cols=cols, vectorizer=vectorizer)
 
 
-def main(
-        task_id: str,
-        run_id: str,
-        num_epochs: int,
-        batch_size: int,
-        learning_rate: float,
-        reuse_epoch: bool,
-        dataset_dir: str,
-        meta: Dict,
-        dataloader_workers: int,
-        triplet_loss_margin: float,
-        tokens_dictionary_path: str
-):
-    init_task_dir(task_id=task_id, run_id=run_id, meta=meta)
+def setup_vectorizer(config: DictConfig) -> TextVectorizer:
+    if config.text_vectorizer.type == "dictionary":
+        c = config.text_vectorizer
+        return DictionaryLoaderTextVectorizer(
+            dictionary_path=c.dictionary_path,
+            word_unigrams_limit=c.word_unigrams_limit,
+            word_bigrams_limit=c.word_bigrams_limit,
+            char_trigrams_limit=c.char_trigrams_limit,
+            num_oov_tokens=c.num_oov_tokens
+        )
+    else:
+        raise ValueError(f"Unknown vectorizer type: {config.text.vectorizer.type}")
 
-    tensorboard_logdir_path = os.path.join(task_id, "tensorboard", run_id)
-    checkpoint_dir_path = os.path.join(task_id, run_id, "checkpoints")
-    model_output_dir_path = os.path.join(task_id, run_id, "models")
+
+def setup_model(config: DictConfig) -> nn.Module:
+    if config.model.type == "SimpleTextEncoder":
+        c = config.model
+        model = SimpleTextEncoder(
+            num_embeddings=c.text_embedding.num_embeddings,
+            embedding_dim=c.text_embedding.embedding_dim,
+            fc_dim=c.fc_dim,
+            output_dim=c.output_dim)
+        return model
+    else:
+        raise ValueError(f"Unknown model type: {config.model.type}")
+
+
+def main(
+        config: DictConfig
+):
+    init_task_dir(
+        task_id=config.task_id,
+        run_id=config.run_id,
+        conf=config)
+
+    tensorboard_logdir_path = os.path.join(config.task_id, "tensorboard", config.run_id)
+    checkpoint_dir_path = os.path.join(config.task_id, config.run_id, "checkpoints")
+    model_output_dir_path = os.path.join(config.task_id, config.run_id, "models")
     model_output_path = os.path.join(model_output_dir_path, "model_weights.pth")
     checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
 
-    vectorizer = DictionaryLoaderTextVectorizer(
-        dictionary_path=tokens_dictionary_path,
-        word_bigrams_limit=WORD_BIGRAMS_LIMIT,
-        word_unigrams_limit=WORD_UNIGRAMS_LIMIT,
-        char_trigrams_limit=CHAR_TRIGRAMS_LIMIT,
-        num_oov_tokens=NUM_OOV_TOKENS
-    )
+    vectorizer = setup_vectorizer(config)
 
     dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], vectorizer=vectorizer)
-    training_dataset = dataset_fn(os.path.join(dataset_dir, "training_dataset"))
-    validation_dataset = dataset_fn(os.path.join(dataset_dir, "validation_dataset"))
+    training_dataset = dataset_fn(os.path.join(config.dataset_dir, "training_dataset"))
+    validation_dataset = dataset_fn(os.path.join(config.dataset_dir, "validation_dataset"))
 
-    triplet_assembler = BatchNegativeTripletsAssembler(batch_size=batch_size, negatives_count=batch_size - 1)
-    training_dataloader = DataLoader(training_dataset, batch_size=batch_size, num_workers=dataloader_workers,
+    triplet_assembler = BatchNegativeTripletsAssembler(batch_size=conf.batch_size, negatives_count=conf.batch_size - 1)
+    training_dataloader = DataLoader(training_dataset, batch_size=conf.batch_size, num_workers=conf.dataloader_workers,
                                      drop_last=True)
-    validation_dataloader = DataLoader(validation_dataset, batch_size=batch_size, num_workers=dataloader_workers,
+    validation_dataloader = DataLoader(validation_dataset, batch_size=conf.batch_size,
+                                       num_workers=conf.dataloader_workers,
                                        drop_last=True)
 
     layout = {
@@ -155,12 +160,12 @@ def main(
 
     tensorboard_writer.add_custom_scalars(layout)
 
-    model = SimpleTextEncoder(num_embeddings=NUM_EMBEDDINGS, embedding_dim=EMBEDDING_DIM, fc_dim=FC_DIM,
-                              output_dim=FC_DIM)
+    model = setup_model(config)
 
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(model.parameters(), lr=conf.learning_rate)
+
     triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y),
-                                                    margin=triplet_loss_margin)
+                                                    margin=conf.loss.margin)
 
     epoch_start = 0
 
@@ -173,7 +178,7 @@ def main(
         checkpoint = torch.load(checkpoints_path, map_location=device)
         model.load_state_dict(checkpoint['model_state_dict'], )
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        if reuse_epoch:
+        if conf.reuse_epoch:
             epoch_start = checkpoint['epoch']
         print(f"Model loaded, will resume from epoch: {epoch_start}...")
     else:
@@ -188,10 +193,10 @@ def main(
     )
 
     recall_validator = RecallValidator(
-        candidates_path=os.path.join(dataset_dir, "recall_validation_items_dataset", "items.json"),
-        queries_path=os.path.join(dataset_dir, "recall_validation_queries_dataset", "queries.json"),
+        candidates_path=os.path.join(conf.dataset_dir, "recall_validation_items_dataset", "items.json"),
+        queries_path=os.path.join(conf.dataset_dir, "recall_validation_queries_dataset", "queries.json"),
         vectorizer=vectorizer,
-        embedding_dim=FC_DIM,
+        embedding_dim=config.model.output_dim,
         similarity_metric=SimilarityMetric.COSINE,
         embedding_batch_size=4096,
         k=1024,
@@ -206,12 +211,12 @@ def main(
         model=model,
         loss_fn=triplet_loss,
         optimizer=optimizer,
-        n_epochs=num_epochs,
+        n_epochs=conf.num_epochs,
         checkpoints_path=checkpoints_path,
         triplet_assembler=triplet_assembler,
         tensorboard_writer=tensorboard_writer,
         loss_validator=validator,
-        recall_validator=recall_validator if args.validate_recall else None
+        recall_validator=recall_validator if config.validate_recall else None
     )
     print("Training finished, saving the model from last epoch...")
 
@@ -222,23 +227,14 @@ def main(
     print("Model saved successfully, exiting...")
 
 
-# --num-epochs 1 --task-id test --run-id 1 --dataset-dir datasets/dataset --commit-hash abc --learning-rate 1e-2 --batch-size 32 --dataloader-workers 2
 if __name__ == '__main__':
     args = get_args()
-    print(f"Starting training job with args: {args}")
+    config_file = args.config_file_path
+    conf = OmegaConf.load(config_file)
+    if args.commit_hash:
+        conf.commit_hash = args.commit_hash
+    print(f"Starting training job with args: {OmegaConf.to_yaml(conf)}")
 
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
 
-    main(
-        num_epochs=args.num_epochs,
-        task_id=args.task_id,
-        run_id=args.run_id,
-        batch_size=args.batch_size,
-        dataset_dir=args.dataset_dir,
-        learning_rate=args.learning_rate,
-        reuse_epoch=args.reuse_epoch,
-        meta=vars(args),
-        dataloader_workers=args.dataloader_workers,
-        triplet_loss_margin=args.triplet_loss_margin,
-        tokens_dictionary_path=args.tokens_dictionary_path
-    )
+    main(conf)
