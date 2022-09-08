@@ -279,7 +279,7 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    model_path = 'models/checkpoints/epoch2'
+    model_path = 'models/tesla_t4_150k_embedding_dim_4m_dataset_margin_01_run_1_batch_size_64/checkpoints/epoch2'
     candidates_path = 'datasets/local/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local/recall_validation_queries_dataset/queries.json'
 
@@ -289,28 +289,28 @@ if __name__ == '__main__':
 
     model = prepare_model(model_config, model_path, from_checkpoint=True)
 
-    recall_validation(candidates_path,
-                      queries_path,
-                      vectorizer=vectorizer,
-                      embedding_dim=128,
-                      similarity_metric=SimilarityMetric.COSINE,
-                      model=model,
-                      embedding_batch_size=4096,
-                      k=1024,
-                      query_batch_size=128,
-                      visualize_path="tensorboard/embeddings",
-                      device=torch.device("cpu")
-                      )
+    # recall_validation(candidates_path,
+    #                   queries_path,
+    #                   vectorizer=vectorizer,
+    #                   embedding_dim=128,
+    #                   similarity_metric=SimilarityMetric.COSINE,
+    #                   model=model,
+    #                   embedding_batch_size=4096,
+    #                   k=1024,
+    #                   query_batch_size=128,
+    #                   visualize_path="tensorboard/embeddings",
+    #                   device=torch.device("cpu")
+    #                   )
 
-    # interactive_search(
-    #     candidates_path,
-    #     num_embeddings=model_config.num_embeddings,
-    #     embedding_dim=128,
-    #     similarity_metric=SimilarityMetric.COSINE,
-    #     model=model,
-    #     embedding_batch_size=4096,
-    #     k=30,
-    #     query_batch_size=128,
-    #     device=torch.device("cpu"),
-    #     vectorizer=vectorizer
-    # )
+    interactive_search(
+        candidates_path,
+        num_embeddings=model_config.num_embeddings,
+        embedding_dim=128,
+        similarity_metric=SimilarityMetric.COSINE,
+        model=model,
+        embedding_batch_size=4096,
+        k=30,
+        query_batch_size=128,
+        device=torch.device("cpu"),
+        vectorizer=vectorizer
+    )

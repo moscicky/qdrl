@@ -15,7 +15,7 @@ from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_validator import LossValidator
 from qdrl.models import SimpleTextEncoder, RegularizedSimpleTextEncoder
-from qdrl.preprocess import TextVectorizer, WordUnigramVectorizer
+from qdrl.preprocess import TextVectorizer, WordUnigramVectorizer, DictionaryLoaderTextVectorizer
 from qdrl.recall_validator import RecallValidator
 from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
 
@@ -93,8 +93,12 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
 
 EMBEDDING_DIM = 256
 FC_DIM = 128
-NUM_EMBEDDINGS = 150000
+NUM_OOV_TOKENS = 50000
+NUM_EMBEDDINGS = 100000 + 40000 + 16000 + NUM_OOV_TOKENS
 TEXT_MAX_LENGTH = 10
+WORD_UNIGRAMS_LIMIT = 8
+WORD_BIGRAMS_LIMIT = 7
+CHAR_TRIGRAMS_LIMIT = 35
 
 
 def dataset_factory(cols: List[str], vectorizer: TextVectorizer) -> Callable[[str], ChunkingDataset]:
@@ -111,7 +115,8 @@ def main(
         dataset_dir: str,
         meta: Dict,
         dataloader_workers: int,
-        triplet_loss_margin: float
+        triplet_loss_margin: float,
+        tokens_dictionary_path: str
 ):
     init_task_dir(task_id=task_id, run_id=run_id, meta=meta)
 
@@ -121,7 +126,13 @@ def main(
     model_output_path = os.path.join(model_output_dir_path, "model_weights.pth")
     checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
 
-    vectorizer = WordUnigramVectorizer(num_features=NUM_EMBEDDINGS, max_length=TEXT_MAX_LENGTH)
+    vectorizer = DictionaryLoaderTextVectorizer(
+        dictionary_path=tokens_dictionary_path,
+        word_bigrams_limit=WORD_BIGRAMS_LIMIT,
+        word_unigrams_limit=WORD_UNIGRAMS_LIMIT,
+        char_trigrams_limit=CHAR_TRIGRAMS_LIMIT,
+        num_oov_tokens=NUM_OOV_TOKENS
+    )
 
     dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], vectorizer=vectorizer)
     training_dataset = dataset_fn(os.path.join(dataset_dir, "training_dataset"))
@@ -148,7 +159,8 @@ def main(
                               output_dim=FC_DIM)
 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y), margin=triplet_loss_margin)
+    triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y),
+                                                    margin=triplet_loss_margin)
 
     epoch_start = 0
 
@@ -209,6 +221,7 @@ def main(
     torch.save(model.state_dict(), model_output_path)
     print("Model saved successfully, exiting...")
 
+
 # --num-epochs 1 --task-id test --run-id 1 --dataset-dir datasets/dataset --commit-hash abc --learning-rate 1e-2 --batch-size 32 --dataloader-workers 2
 if __name__ == '__main__':
     args = get_args()
@@ -226,5 +239,6 @@ if __name__ == '__main__':
         reuse_epoch=args.reuse_epoch,
         meta=vars(args),
         dataloader_workers=args.dataloader_workers,
-        triplet_loss_margin=args.triplet_loss_margin
+        triplet_loss_margin=args.triplet_loss_margin,
+        tokens_dictionary_path=args.tokens_dictionary_path
     )

@@ -71,4 +71,11 @@ def get_args():
         default=1.0
     )
 
+    args_parser.add_argument(
+        '--tokens-dictionary-path',
+        type=str,
+        default=None,
+        required=True
+    )
+
     return args_parser.parse_args()

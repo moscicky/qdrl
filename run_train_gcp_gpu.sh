@@ -22,9 +22,9 @@ GPU_CARD="NVIDIA_TESLA_T4"
 GPU_COUNT=1
 
 #job arguments
-TASK_ID="tesla_t4_150k_embedding_dim_4m_dataset_margin_01"
+TASK_ID="vectorizer_100k_40k_16k"
 NUM_EPOCHS=6
-RUN_ID="run_1_batch_size_64"
+RUN_ID="run_1"
 BATCH_SIZE=64
 LEARNING_RATE=1e-2
 TRIPLET_LOSS_MARGIN=0.1
@@ -41,6 +41,7 @@ else
   BASE_DIR="/gcs/${BUCKET}"
   TASK_DIR="${BASE_DIR}/training/${TASK_ID}"
   DATASET_DIR="${BASE_DIR}/${DATASET_SUBDIR}/"
+  DICTIONARY_DIR="${BASE_DIR}/${DATASET_SUBDIR}/dictionary_100k_46k_16k"
 fi
 
 # TODO: remove this. Using prebuild image until pushing to eu gcr is possible
@@ -65,5 +66,5 @@ gcloud ai custom-jobs create \
   --region=${REGION} \
   --display-name=${DISPLAY_NAME} \
   --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},container-image-uri=${CONTAINER_IMAGE_URI},accelerator-type=${GPU_CARD},accelerator-count=${GPU_COUNT} \
-  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--dataset-dir=${DATASET_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--dataloader-workers=${DATALOADER_WORKERS},--validate-recall,--triplet-loss-margin=${TRIPLET_LOSS_MARGIN}
+  --args=--num-epochs=${NUM_EPOCHS},--task-id=${TASK_DIR},--run-id=${RUN_ID},--dataset-dir=${DATASET_DIR},--reuse-epoch,--commit-hash=${COMMIT_HASH},--batch-size=${BATCH_SIZE},--learning-rate=${LEARNING_RATE},--dataloader-workers=${DATALOADER_WORKERS},--validate-recall,--triplet-loss-margin=${TRIPLET_LOSS_MARGIN},--tokens-dictionary-path=${DICTIONARY_DIR}
 #  #  --worker-pool-spec=machine-type=${MACHINE_TYPE},replica-count=${REPLICA_COUNT},executor-image-uri=${EXECUTOR_IMAGE_URI},local-package-path=${WORKING_DIRECTORY},python-module=${PYTHON_MODULE} \

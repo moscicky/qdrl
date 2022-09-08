@@ -4,11 +4,11 @@ PYTHON_MODULE="qdrl.main_train"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
 #RUN_ID="..."
 
-TASK_ID="4m_dataset_margin_05"
+TASK_ID="vectorizer_dictionary_100k_46k_16k"
 DISPLAY_NAME="${TASK_ID}_${RUN_ID}"
 EXTRA_DIRS="datasets,bucket"
 LEARNING_RATE=1e-2
-TRIPLET_LOSS_MARGIN=0.5
+TRIPLET_LOSS_MARGIN=0.1
 
 # build image which will be pushed to gcr
 if [[ -z "${PROJECT}" ]]; then
@@ -39,4 +39,5 @@ gcloud ai custom-jobs local-run \
   --reuse-epoch \
   --dataloader-workers=4 \
   --validate-recall \
-  --triplet-loss-margin=${TRIPLET_LOSS_MARGIN}
+  --triplet-loss-margin=${TRIPLET_LOSS_MARGIN}\
+  --tokens-dictionary-path=datasets/docker/dictionary_100k_46k_16k
