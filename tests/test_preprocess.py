@@ -45,6 +45,21 @@ class TestPreprocess:
                               7, 9,
                               1, 4, 9, 5, 6, 8]
 
-        # ala, ma, kota
-        # ala ma, ma kota (oov)
-        # ala, la_, a_m(oov), ma_,  a_k (oov)
+    def test_dicitionary_vectorizer_only_token_ungirams(self):
+        dictionary = {
+            "ala": 1,
+            "ma": 2,
+            "kota": 3
+        }
+
+        vectorizer = DictionaryTextVectorizer(
+            word_unigrams_limit=4, char_trigrams_limit=0, word_bigrams_limit=0, dictionary=dictionary,
+            num_oov_tokens=2
+        )
+
+        vectorized = vectorizer.vectorize("ala ma kota zielonego 23")
+        assert vectorized == [1, 2, 3, 5]
+
+    # ala, ma, kota
+    # ala ma, ma kota (oov)
+    # ala, la_, a_m(oov), ma_,  a_k (oov)
