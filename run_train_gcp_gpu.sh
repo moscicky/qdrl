@@ -41,7 +41,7 @@ else
   BASE_DIR="/gcs/${BUCKET}"
   TASK_DIR="${BASE_DIR}/training/${TASK_ID}"
   DATASET_DIR="${BASE_DIR}/${DATASET_SUBDIR}/"
-  DICTIONARY_DIR="${BASE_DIR}/${DATASET_SUBDIR}/dictionary_100k_46k_16k"
+  DICTIONARY_DIR="${BASE_DIR}/${DATASET_SUBDIR}/token_dictionary_100k_40k_16k"
 fi
 
 # TODO: remove this. Using prebuild image until pushing to eu gcr is possible
