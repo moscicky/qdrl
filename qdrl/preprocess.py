@@ -42,7 +42,7 @@ class DictionaryTextVectorizer(TextVectorizer):
         return arr
 
     def vectorize_oov(self, token: str) -> int:
-        return (int(md5(token.encode('utf-8')).hexdigest(), 16) % self.num_oov_tokens) + self.num_tokens + 1
+        return (int(md5(token.encode('utf-8')).hexdigest(), 16) % (self.num_oov_tokens - 1) + self.num_tokens + 1)
 
     def vectorize_from_dict(self, tokens: List[str]) -> List[int]:
         return [self.dictionary[token] if token in self.dictionary else self.vectorize_oov(token) for token in
