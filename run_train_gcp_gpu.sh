@@ -27,6 +27,7 @@ gsu
 echo "staring training job with args"
 echo "CONTAINER_IMAGE_URI: $CONTAINER_IMAGE_URI"
 echo "DISPLAY_NAME: $DISPLAY_NAME"
+echo "CONFIG_URL: $CONFIG_URL"
 # https://cloud.google.com/sdk/gcloud/reference/ai/custom-jobs/create
 
 gcloud ai custom-jobs create \
