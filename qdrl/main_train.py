@@ -94,11 +94,11 @@ def init_task_dir(task_id: str, run_id: str, meta: Dict):
 EMBEDDING_DIM = 256
 FC_DIM = 128
 NUM_OOV_TOKENS = 50000
-NUM_EMBEDDINGS = 100000 + 40000 + 16000 + NUM_OOV_TOKENS
+NUM_EMBEDDINGS = 150000 + 0 + 0 + NUM_OOV_TOKENS
 TEXT_MAX_LENGTH = 10
 WORD_UNIGRAMS_LIMIT = 8
-WORD_BIGRAMS_LIMIT = 7
-CHAR_TRIGRAMS_LIMIT = 35
+WORD_BIGRAMS_LIMIT = 0
+CHAR_TRIGRAMS_LIMIT = 0
 
 
 def dataset_factory(cols: List[str], vectorizer: TextVectorizer) -> Callable[[str], ChunkingDataset]:

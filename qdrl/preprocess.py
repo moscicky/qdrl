@@ -49,11 +49,15 @@ class DictionaryTextVectorizer(TextVectorizer):
                 tokens]
 
     def vectorize_word_unigram(self, text: str) -> List[int]:
+        if self.word_unigrams_limit == 0:
+            return []
         word_unigrams = text.split(sep=" ")
         vectorized = self.vectorize_from_dict(word_unigrams)
         return self.pad(vectorized, max_size=self.word_unigrams_limit)
 
     def vectorize_word_bigram(self, text: str) -> List[int]:
+        if self.word_bigrams_limit == 0:
+            return []
         word_unigrams = text.split(sep=" ")
         word_bigrams = []
         if len(word_unigrams) > 1:
@@ -62,6 +66,8 @@ class DictionaryTextVectorizer(TextVectorizer):
         return self.pad(vectorized, max_size=self.word_bigrams_limit)
 
     def vectorize_char_trigram(self, text: str) -> List[int]:
+        if self.char_trigrams_limit == 0:
+            return []
         char_trigrams = re.findall(r'(?=(...))', text)
         vectorized = self.vectorize_from_dict(char_trigrams)
         return self.pad(vectorized, max_size=self.char_trigrams_limit)
