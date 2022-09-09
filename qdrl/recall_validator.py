@@ -10,7 +10,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from qdrl.configs import SimilarityMetric, ModelConfig
 from qdrl.models import SimpleTextEncoder
-from qdrl.preprocess import clean_phrase, TextVectorizer, WordUnigramVectorizer
+from qdrl.preprocess import clean_phrase, TextVectorizer, WordUnigramVectorizer, DictionaryLoaderTextVectorizer
 
 
 def prepare_model(
@@ -279,13 +279,18 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    model_path = 'models/tesla_t4_150k_embedding_dim_4m_dataset_margin_01_run_1_batch_size_64/checkpoints/epoch2'
+    model_path = 'models/vectorizer_100k_40k_16k/training_vectorizer_100k_40k_16k_run_1_checkpoints_checkpoint'
     candidates_path = 'datasets/local/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local/recall_validation_queries_dataset/queries.json'
 
-    model_config = ModelConfig(num_embeddings=150000, embedding_dim=128)
+    model_config = ModelConfig(num_embeddings=206000, embedding_dim=128)
 
-    vectorizer = WordUnigramVectorizer(num_features=model_config.num_embeddings, max_length=10)
+    vectorizer = DictionaryLoaderTextVectorizer(
+        dictionary_path="datasets/local/dictionary_100k_46k_16k",
+        word_unigrams_limit=8,
+        word_bigrams_limit=7,
+        char_trigrams_limit=35,
+        num_oov_tokens=50000)
 
     model = prepare_model(model_config, model_path, from_checkpoint=True)
 
