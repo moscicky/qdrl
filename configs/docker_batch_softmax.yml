@@ -19,7 +19,7 @@ text_vectorizer:
 model:
   type: SimpleTextEncoder
   text_embedding:
-    num_embeddings: 200001
+    num_embeddings: 200000
     embedding_dim: 256
   fc_dim: 128
   output_dim: 128

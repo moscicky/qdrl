@@ -1,11 +1,12 @@
 EXECUTOR_IMAGE_URI="europe-docker.pkg.dev/vertex-ai/training/pytorch-gpu.1-11:latest"
 WORKING_DIRECTORY="."
 PYTHON_MODULE="qdrl.main_train"
-NAME="omega_conf_test"
+NAME="batch_softmax"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
 
 DISPLAY_NAME="${NAME}_${RUN_ID}"
 EXTRA_DIRS="datasets,configs"
+CONFIG="docker_batch_softmax.yml"
 
 # build image which will be pushed to gcr
 if [[ -z "${PROJECT}" ]]; then
@@ -26,5 +27,5 @@ gcloud ai custom-jobs local-run \
   --output-image-uri=$OUTPUT_IMAGE_URI \
   --extra-dirs=$EXTRA_DIRS \
   -- \
-  --config-file-path=configs/docker.yml \
+  --config-file-path=configs/${CONFIG} \
   --commit-hash=${COMMIT_HASH}

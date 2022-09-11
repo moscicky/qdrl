@@ -6,7 +6,7 @@ REPLICA_COUNT=1
 GPU_CARD="NVIDIA_TESLA_T4"
 GPU_COUNT=1
 
-NAME="150k_word_unigram_150k_oov"
+NAME="batch_softmax_vs_triplet_loss_small_dataset_batch_softmax"
 
 DISPLAY_NAME="${NAME}_$(date +'%Y_%m_%dT%H_%M')"
 
