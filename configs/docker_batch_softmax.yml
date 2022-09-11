@@ -7,10 +7,8 @@ learning_rate: 1e-2
 reuse_epoch: True
 dataloader_workers: 4
 loss:
-  type: triplet
-  margin: 0.1
+  type: batch_softmax
   batch_size: 64
-  num_negatives: 63
 text_vectorizer:
   type: dictionary
   dictionary_path: datasets/docker/token_dictionary_150k_0k_0k

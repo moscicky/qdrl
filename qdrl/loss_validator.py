@@ -2,18 +2,16 @@ import torch
 from torch import nn
 from torch.utils.data import DataLoader
 
-from qdrl.triplets import TripletAssembler
+from qdrl.loss_computer import LossComputer
 
 
 class LossValidator:
     def __init__(self, dataloader: DataLoader,
-                 loss_fn: nn.TripletMarginWithDistanceLoss,
-                 triplet_assembler: TripletAssembler,
+                 loss_computer: LossComputer,
                  device: torch.device
                  ):
         self.dataloader = dataloader
-        self.loss_fn = loss_fn
-        self.triplet_assembler = triplet_assembler
+        self.loss_computer = loss_computer
         self.device = device
 
     def validate(self, model: nn.Module, epoch: int):
@@ -22,8 +20,7 @@ class LossValidator:
         print(f"Starting validation after epoch: {epoch}")
         with torch.no_grad():
             for batch_idx, batch in enumerate(self.dataloader):
-                anchor, positive, negative = self.triplet_assembler.generate_triplets(model, batch, self.device)
-                loss = self.loss_fn(anchor=anchor, positive=positive, negative=negative)
+                loss = self.loss_computer.compute(model=model, batch=batch, device=self.device)
                 batch_loss = loss.item()
                 validation_loss += batch_loss
                 if batch_idx % 10_000 == 0:

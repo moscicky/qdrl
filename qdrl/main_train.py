@@ -7,17 +7,18 @@ from torch import nn
 from torch.utils.data import DataLoader
 from torch.utils.tensorboard import SummaryWriter
 from torch import optim
-import torch.nn.functional as F
 
 from qdrl.args import get_args
+from qdrl.batch_softmax_cross_entropy_loss import BatchSoftmaxCrossEntropyLossComputer
 from qdrl.checkpoints import save_checkpoint
 from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
+from qdrl.loss_computer import LossComputer
 from qdrl.loss_validator import LossValidator
 from qdrl.models import SimpleTextEncoder
 from qdrl.preprocess import TextVectorizer, DictionaryLoaderTextVectorizer
 from qdrl.recall_validator import RecallValidator
-from qdrl.triplets import TripletAssembler, BatchNegativeTripletsAssembler
+from qdrl.triplet_loss import BatchTripletLossComputer
 
 
 def train(
@@ -25,11 +26,10 @@ def train(
         epoch_start: int,
         dataloader: DataLoader,
         model: nn.Module,
-        loss_fn: nn.TripletMarginWithDistanceLoss,
+        loss_computer: LossComputer,
         optimizer: optim.Optimizer,
         n_epochs: int,
         checkpoints_path: str,
-        triplet_assembler: TripletAssembler,
         tensorboard_writer: SummaryWriter,
         loss_validator: LossValidator,
         recall_validator: Optional[RecallValidator] = None
@@ -41,9 +41,7 @@ def train(
         epoch_loss = 0.0
         print(f"Starting epoch: {epoch}")
         for batch_idx, batch in enumerate(dataloader):
-            anchor, positive, negative = triplet_assembler.generate_triplets(model, batch, device)
-            loss = loss_fn(anchor=anchor, positive=positive, negative=negative)
-
+            loss = loss_computer.compute(model=model, batch=batch, device=device)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
@@ -122,6 +120,19 @@ def setup_model(config: DictConfig) -> nn.Module:
         raise ValueError(f"Unknown model type: {config.model.type}")
 
 
+def setup_loss(config: DictConfig) -> LossComputer:
+    if config.loss.type == "triplet":
+        return BatchTripletLossComputer(
+            batch_size=conf.loss.batch_size,
+            negatives_count=conf.loss.num_negatives,
+            loss_margin=conf.loss.margin)
+    elif config.loss.type == "batch_softmax":
+        return BatchSoftmaxCrossEntropyLossComputer(
+            batch_size=conf.loss.batch_size
+        )
+    raise ValueError(f"Unknown loss type: {config.loss.type}")
+
+
 def main(
         config: DictConfig
 ):
@@ -142,7 +153,7 @@ def main(
     training_dataset = dataset_fn(os.path.join(config.dataset_dir, "training_dataset"))
     validation_dataset = dataset_fn(os.path.join(config.dataset_dir, "validation_dataset"))
 
-    triplet_assembler = BatchNegativeTripletsAssembler(batch_size=conf.batch_size, negatives_count=conf.batch_size - 1)
+    loss_computer = setup_loss(config)
     training_dataloader = DataLoader(training_dataset, batch_size=conf.batch_size, num_workers=conf.dataloader_workers,
                                      drop_last=True)
     validation_dataloader = DataLoader(validation_dataset, batch_size=conf.batch_size,
@@ -164,9 +175,6 @@ def main(
 
     optimizer = optim.Adam(model.parameters(), lr=conf.learning_rate)
 
-    triplet_loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y),
-                                                    margin=conf.loss.margin)
-
     epoch_start = 0
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -187,8 +195,7 @@ def main(
 
     validator = LossValidator(
         dataloader=validation_dataloader,
-        loss_fn=triplet_loss,
-        triplet_assembler=triplet_assembler,
+        loss_computer=loss_computer,
         device=device
     )
 
@@ -209,11 +216,10 @@ def main(
         epoch_start=epoch_start,
         dataloader=training_dataloader,
         model=model,
-        loss_fn=triplet_loss,
+        loss_computer=loss_computer,
         optimizer=optimizer,
         n_epochs=conf.num_epochs,
         checkpoints_path=checkpoints_path,
-        triplet_assembler=triplet_assembler,
         tensorboard_writer=tensorboard_writer,
         loss_validator=validator,
         recall_validator=recall_validator if config.validate_recall else None

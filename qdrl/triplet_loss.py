@@ -1,25 +1,13 @@
-import abc
 from typing import Tuple, List
 
 import torch
 from torch import nn
-# from torch.cuda.amp import autocast
+import torch.nn.functional as F
+
+from qdrl.loss_computer import LossComputer
 
 
-class TripletAssembler(abc.ABC):
-
-    @abc.abstractmethod
-    def generate_triplets(self,
-                          model: nn.Module,
-                          batch: Tuple[torch.tensor, ...],
-                          device: torch.device
-                          ) -> [torch.tensor,
-                                torch.tensor,
-                                torch.tensor]:
-        pass
-
-
-class BatchNegativeTripletsAssembler(TripletAssembler):
+class BatchNegativeTripletsAssembler:
     def __init__(self, batch_size: int, negatives_count: int):
         self.anchor_mask, self.positive_mask, self.negative_mask = self.batch_negative_triplets_mask(batch_size,
                                                                                                      negatives_count)
@@ -32,7 +20,6 @@ class BatchNegativeTripletsAssembler(TripletAssembler):
                                 torch.tensor,
                                 torch.tensor]:
         anchor, positive = batch[0].to(device), batch[1].to(device)
-        # with autocast():
         anchor_out = model(anchor)
         positive_out = model(positive)
 
@@ -57,3 +44,15 @@ class BatchNegativeTripletsAssembler(TripletAssembler):
                     positive_mask.append(anchor_idx)
                     negative_mask.append(positive_idx)
         return anchor_mask, positive_mask, negative_mask
+
+
+class BatchTripletLossComputer(LossComputer):
+    def __init__(self, batch_size: int, negatives_count: int, loss_margin: float):
+        self.triplet_assembler = BatchNegativeTripletsAssembler(batch_size=batch_size, negatives_count=negatives_count)
+        self.loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y),
+                                                     margin=loss_margin)
+
+    def compute(self, model: nn.Module, batch: Tuple[torch.tensor, ...], device: torch.device) -> torch.tensor:
+        anchor, positive, negative = self.triplet_assembler.generate_triplets(model, batch, device)
+        loss = self.loss(anchor=anchor, positive=positive, negative=negative)
+        return loss
