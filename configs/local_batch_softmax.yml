@@ -1,5 +1,5 @@
-task_id: "new_loss"
-run_id: "triplets"
+task_id: "local_runs"
+run_id: "batch_softmax"
 num_epochs: 5
 dataset_dir: "datasets/local"
 commit_hash: "whatever"

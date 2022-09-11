@@ -4,9 +4,12 @@
 
 test-reports
 
+datasets
 datasets/*
 bucket/*
 models/*
-
+models
 conifgs_remote/*
 configs_remote
+local_runs/*
+local_runs
