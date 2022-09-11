@@ -6,7 +6,7 @@ REPLICA_COUNT=1
 GPU_CARD="NVIDIA_TESLA_T4"
 GPU_COUNT=1
 
-NAME="omega_conf_test"
+NAME="150k_word_unigram_150k_oov"
 
 DISPLAY_NAME="${NAME}_$(date +'%Y_%m_%dT%H_%M')"
 

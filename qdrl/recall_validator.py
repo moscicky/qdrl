@@ -163,6 +163,8 @@ def calculate_recall(query_results: np.ndarray, queries: List[Dict],
         if relevant_aux_ids:
             intersection = set(query_result).intersection(set(relevant_aux_ids))
             num_found = len(intersection)
+            # if num_found == 0:
+            #     print(f"Not found any products: {queries[idx]['query_search_phrase']}")
             recall = num_found / len(relevant_aux_ids)
             recalls.append(recall)
     print(f"Number of candidates not found during recall validation: {missing_counter}")
@@ -279,20 +281,20 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    model_path = 'models/vectorizer_100k_40k_16k/training_vectorizer_100k_40k_16k_run_1_checkpoints_checkpoint'
+    model_path = 'models/vectorizer_150k_0k_0k_150k/model.pth'
     candidates_path = 'datasets/local/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local/recall_validation_queries_dataset/queries.json'
 
-    model_config = ModelConfig(num_embeddings=206000, embedding_dim=128)
+    model_config = ModelConfig(num_embeddings=300000, embedding_dim=128)
 
     vectorizer = DictionaryLoaderTextVectorizer(
-        dictionary_path="datasets/local/dictionary_100k_46k_16k",
+        dictionary_path="datasets/local/token_dictionary_150k_0k_0k",
         word_unigrams_limit=8,
-        word_bigrams_limit=7,
-        char_trigrams_limit=35,
-        num_oov_tokens=50000)
+        word_bigrams_limit=0,
+        char_trigrams_limit=0,
+        num_oov_tokens=150000)
 
-    model = prepare_model(model_config, model_path, from_checkpoint=True)
+    model = prepare_model(model_config, model_path, from_checkpoint=False)
 
     # recall_validation(candidates_path,
     #                   queries_path,
