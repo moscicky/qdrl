@@ -8,7 +8,8 @@ install_requirements = [
     "tensorboard==2.9.0",
     "protobuf==3.20.1",
     "faiss-cpu==1.7.2",
-    "omegaconf==2.2.3"
+    "omegaconf==2.2.3",
+    "pyarrow==9.0.0"
 ]
 
 test_requirements = [
