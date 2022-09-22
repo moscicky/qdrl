@@ -35,4 +35,4 @@ class BatchSoftmaxCrossEntropyLossComputer(LossComputer):
         # ...
         # [cos(an,p1), cos(an, p2) ... cos(an, pn)]
         similarity_matrix = batch_cosine(anchor_out, positive_out)
-        return self.loss(similarity_matrix, self.target)
+        return self.loss(similarity_matrix, self.target.to(device))
