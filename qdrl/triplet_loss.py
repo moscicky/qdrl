@@ -5,6 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 
 from qdrl.loss_computer import LossComputer
+from qdrl.models import TwoTower
 
 
 class BatchNegativeTripletsAssembler:
@@ -20,8 +21,13 @@ class BatchNegativeTripletsAssembler:
                                 torch.tensor,
                                 torch.tensor]:
         anchor, positive = batch[0].to(device), batch[1].to(device)
-        anchor_out = model(anchor)
-        positive_out = model(positive)
+
+        if isinstance(model, TwoTower):
+            anchor_out = model.forward_query(anchor)
+            positive_out = model.forward_product(positive)
+        else:
+            anchor_out = model(anchor)
+            positive_out = model(positive)
 
         anchor = anchor_out[self.anchor_mask]
         positive = positive_out[self.positive_mask]

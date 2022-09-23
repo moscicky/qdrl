@@ -15,7 +15,7 @@ from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_computer import LossComputer
 from qdrl.loss_validator import LossValidator
-from qdrl.models import SimpleTextEncoder
+from qdrl.models import SimpleTextEncoder, TwoTower
 from qdrl.preprocess import TextVectorizer, DictionaryLoaderTextVectorizer
 from qdrl.recall_validator import RecallValidator
 from qdrl.triplet_loss import BatchTripletLossComputer
@@ -115,6 +115,14 @@ def setup_model(config: DictConfig) -> nn.Module:
             embedding_dim=c.text_embedding.embedding_dim,
             fc_dim=c.fc_dim,
             output_dim=c.output_dim)
+        return model
+    if config.model.type == "TwoTower":
+        c = config.model
+        model = TwoTower(
+            num_embeddings=c.text_embedding.num_embeddings,
+            text_embedding_dim=c.text_embedding.embedding_dim,
+            output_dim=c.output_dim
+        )
         return model
     else:
         raise ValueError(f"Unknown model type: {config.model.type}")
