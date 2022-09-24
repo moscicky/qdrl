@@ -90,8 +90,6 @@ def init_task_dir(task_id: str, run_id: str, conf: DictConfig):
 def dataset_factory(cols: List[str], vectorizer: TextVectorizer) -> Callable[[str], ChunkingDataset]:
     return lambda p: ChunkingDataset(p, cols=cols, vectorizer=vectorizer)
 
-
-
 def main(
         config: DictConfig
 ):
@@ -108,7 +106,7 @@ def main(
 
     vectorizer = setup_vectorizer(config)
 
-    dataset_fn = dataset_factory(cols=["query_search_phrase", "product_name"], vectorizer=vectorizer)
+    dataset_fn = dataset_factory(cols=conf.features, vectorizer=vectorizer)
     training_dataset = dataset_fn(os.path.join(config.dataset_dir, "training_dataset"))
     validation_dataset = dataset_fn(os.path.join(config.dataset_dir, "validation_dataset"))
 

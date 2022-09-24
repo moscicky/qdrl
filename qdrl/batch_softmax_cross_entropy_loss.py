@@ -1,11 +1,11 @@
-from typing import Tuple
+from typing import Dict
 
 import numpy as np
 import torch
 from torch import nn
 
+from qdrl.batch_predictor import predict
 from qdrl.loss_computer import LossComputer
-from qdrl.models import TwoTower
 
 
 def batch_cosine(a: torch.tensor, b: torch.tensor, eps: float = 1e-8) -> torch.tensor:
@@ -26,15 +26,9 @@ class BatchSoftmaxCrossEntropyLossComputer(LossComputer):
 
     def compute(self,
                 model: nn.Module,
-                batch: Tuple[torch.tensor, ...],
+                batch: Dict[str, torch.Tensor],
                 device: torch.device) -> torch.tensor:
-        anchor, positive = batch[0].to(device), batch[1].to(device)
-        if isinstance(model, TwoTower):
-            anchor_out = model.forward_query(anchor)
-            positive_out = model.forward_product(positive)
-        else:
-            anchor_out = model(anchor)
-            positive_out = model(positive)
+        anchor_out, positive_out = predict(model, batch, device)
         # compute similarity matrix:
         # [cos(a1,p1), cos(a1, p2) ... cos(a1, pn)]
         # ...

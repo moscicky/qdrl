@@ -1,0 +1,46 @@
+task_id: "local_runs"
+run_id: "two_tower"
+num_epochs: 5
+dataset_dir: "datasets/local_parquet"
+commit_hash: "whatever"
+batch_size: 64
+learning_rate: 1e-2
+reuse_epoch: True
+dataloader_workers: 4
+dataset:
+  query_features:
+    - "query_search_phrase"
+  product_features:
+    - "product_name"
+    - "product_category_id"
+loss:
+  type: triplet
+  margin: 0.1
+  batch_size: 64
+  num_negatives: 63
+negatives:
+  type: batch
+text_vectorizer:
+  type: dictionary
+  dictionary_path: datasets/local/token_dictionary_150k_0k_0k
+  word_unigrams_limit: 8
+  word_bigrams_limit: 0
+  char_trigrams_limit: 0
+  num_oov_tokens: 50000
+model:
+  type: MultiModalTwoTower
+  text_embedding:
+    num_embeddings: 200000
+    embedding_dim: 256
+  query:
+    fc_dim: 128
+  product:
+    fc_dim: 128
+    input:
+      - type: text
+        name: "product_name"
+      - type: categorical
+        name: "product_category_id"
+        embedding_dim: 7
+  output_dim: 128
+validate_recall: False
