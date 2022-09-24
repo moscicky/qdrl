@@ -9,16 +9,14 @@ from torch.utils.tensorboard import SummaryWriter
 from torch import optim
 
 from qdrl.args import get_args
-from qdrl.batch_softmax_cross_entropy_loss import BatchSoftmaxCrossEntropyLossComputer
 from qdrl.checkpoints import save_checkpoint
 from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_computer import LossComputer
 from qdrl.loss_validator import LossValidator
-from qdrl.models import SimpleTextEncoder, TwoTower
-from qdrl.preprocess import TextVectorizer, DictionaryLoaderTextVectorizer
+from qdrl.preprocess import TextVectorizer
 from qdrl.recall_validator import RecallValidator
-from qdrl.triplet_loss import BatchTripletLossComputer
+from qdrl.setup import setup_vectorizer, setup_loss, setup_model
 
 
 def train(
@@ -92,53 +90,6 @@ def init_task_dir(task_id: str, run_id: str, conf: DictConfig):
 def dataset_factory(cols: List[str], vectorizer: TextVectorizer) -> Callable[[str], ChunkingDataset]:
     return lambda p: ChunkingDataset(p, cols=cols, vectorizer=vectorizer)
 
-
-def setup_vectorizer(config: DictConfig) -> TextVectorizer:
-    if config.text_vectorizer.type == "dictionary":
-        c = config.text_vectorizer
-        return DictionaryLoaderTextVectorizer(
-            dictionary_path=c.dictionary_path,
-            word_unigrams_limit=c.word_unigrams_limit,
-            word_bigrams_limit=c.word_bigrams_limit,
-            char_trigrams_limit=c.char_trigrams_limit,
-            num_oov_tokens=c.num_oov_tokens
-        )
-    else:
-        raise ValueError(f"Unknown vectorizer type: {config.text.vectorizer.type}")
-
-
-def setup_model(config: DictConfig) -> nn.Module:
-    if config.model.type == "SimpleTextEncoder":
-        c = config.model
-        model = SimpleTextEncoder(
-            num_embeddings=c.text_embedding.num_embeddings,
-            embedding_dim=c.text_embedding.embedding_dim,
-            fc_dim=c.fc_dim,
-            output_dim=c.output_dim)
-        return model
-    if config.model.type == "TwoTower":
-        c = config.model
-        model = TwoTower(
-            num_embeddings=c.text_embedding.num_embeddings,
-            text_embedding_dim=c.text_embedding.embedding_dim,
-            output_dim=c.output_dim
-        )
-        return model
-    else:
-        raise ValueError(f"Unknown model type: {config.model.type}")
-
-
-def setup_loss(config: DictConfig) -> LossComputer:
-    if config.loss.type == "triplet":
-        return BatchTripletLossComputer(
-            batch_size=conf.loss.batch_size,
-            negatives_count=conf.loss.num_negatives,
-            loss_margin=conf.loss.margin)
-    elif config.loss.type == "batch_softmax":
-        return BatchSoftmaxCrossEntropyLossComputer(
-            batch_size=conf.loss.batch_size
-        )
-    raise ValueError(f"Unknown loss type: {config.loss.type}")
 
 
 def main(

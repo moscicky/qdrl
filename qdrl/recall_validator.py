@@ -5,20 +5,21 @@ from typing import Dict, List, Optional
 import faiss
 import numpy as np
 import torch
+from omegaconf import OmegaConf
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 
-from qdrl.configs import SimilarityMetric, ModelConfig
-from qdrl.models import SimpleTextEncoder
-from qdrl.preprocess import clean_phrase, TextVectorizer, WordUnigramVectorizer, DictionaryLoaderTextVectorizer
+from qdrl.configs import SimilarityMetric
+from qdrl.models import TwoTower
+from qdrl.preprocess import clean_phrase, TextVectorizer
+from qdrl.setup import setup_model, setup_vectorizer
 
 
 def prepare_model(
-        model_config: ModelConfig,
+        model: nn.Module,
         model_path: str,
         from_checkpoint: bool = False
 ) -> nn.Module:
-    model = SimpleTextEncoder(num_embeddings=model_config.num_embeddings, embedding_dim=256, fc_dim=128, output_dim=128)
     model_state = torch.load(model_path, map_location=torch.device('cpu'))[
         "model_state_dict"] if from_checkpoint else torch.load(model_path, map_location=torch.device('cpu'))
     model.load_state_dict(model_state)
@@ -49,7 +50,8 @@ def vectorize(texts: List[str],
     return np.array(vectorized)
 
 
-def embed(texts: np.ndarray, model: nn.Module, batch_size: int, device: torch.device) -> np.ndarray:
+def embed(texts: np.ndarray, model: nn.Module, batch_size: int, device: torch.device,
+          tower: str = "none") -> np.ndarray:
     model.eval()
     idx = 0
     cnt = texts.shape[0]
@@ -64,7 +66,13 @@ def embed(texts: np.ndarray, model: nn.Module, batch_size: int, device: torch.de
         batch = texts[idx:idx + batch_size, :]
         batch_tensor = torch.from_numpy(batch).to(device)
         with torch.no_grad():
-            text_embedded = model(batch_tensor).detach().cpu().numpy()
+            if tower == "query":
+                t = model.forward_query(batch_tensor)
+            elif tower == "product":
+                t = model.forward_product(batch_tensor)
+            else:
+                t = model(batch_tensor)
+            text_embedded = t.detach().cpu().numpy()
         embeddings.append(text_embedded)
         idx += batch_size
         batch_idx += 1
@@ -128,7 +136,8 @@ def candidates_index(candidates_path: str, vectorizer: TextVectorizer, embedding
     print("Loaded candidates")
     candidates_vectorized = vectorize([c["product_name"] for c in candidates.values()], vectorizer)
     print("Vectorized candidates")
-    candidate_embeddings = embed(candidates_vectorized, model, batch_size=embedding_batch_size, device=device)
+    tower = "product" if isinstance(model, TwoTower) else "none"
+    candidate_embeddings = embed(candidates_vectorized, model, batch_size=embedding_batch_size, device=device, tower=tower)
     print("Embedded candidates")
     index = create_index(embedding_dim, candidate_embeddings, similarity_metric)
     print("Created candidates index")
@@ -174,7 +183,6 @@ def calculate_recall(query_results: np.ndarray, queries: List[Dict],
 
 def interactive_search(candidates_path: str,
                        vectorizer: TextVectorizer,
-                       num_embeddings: int,
                        embedding_dim: int,
                        embedding_batch_size: int,
                        query_batch_size: int,
@@ -195,7 +203,8 @@ def interactive_search(candidates_path: str,
     while True:
         query = input("Type your query: \n")
         query_vectorized = vectorize([query], vectorizer)
-        query_embeddings = embed(query_vectorized, model, batch_size=embedding_batch_size, device=device)
+        tower = "query" if isinstance(model, TwoTower) else "none"
+        query_embeddings = embed(query_vectorized, model, batch_size=embedding_batch_size, device=device, tower=tower)
         query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
         for query_result in query_results.tolist():
             for result_idx, result in enumerate(query_result):
@@ -229,7 +238,8 @@ def recall_validation(
     print("Loaded queries")
     queries_vectorized = vectorize([q["query_search_phrase"] for q in queries], vectorizer)
     print("Vectorized queries")
-    query_embeddings = embed(queries_vectorized, model, batch_size=embedding_batch_size, device=device)
+    tower = "query" if isinstance(model, TwoTower) else "none"
+    query_embeddings = embed(queries_vectorized, model, batch_size=embedding_batch_size, device=device, tower=tower)
     print("Embedded queries")
     query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
     print("Executed queries")
@@ -281,43 +291,40 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    model_path = 'models/vectorizer_150k_0k_0k_150k/model.pth'
-    candidates_path = 'datasets/local/recall_validation_items_dataset/items.json'
-    queries_path = 'datasets/local/recall_validation_queries_dataset/queries.json'
+    config_file = "local_runs/two_tower/config.yaml"
+    model_path = 'local_runs/two_tower/checkpoints/checkpoint'
 
-    model_config = ModelConfig(num_embeddings=300000, embedding_dim=128)
+    candidates_path = 'datasets/local_parquet/recall_validation_items_dataset/items.json'
+    queries_path = 'datasets/local_parquet/recall_validation_queries_dataset/queries.json'
 
-    vectorizer = DictionaryLoaderTextVectorizer(
-        dictionary_path="datasets/local/token_dictionary_150k_0k_0k",
-        word_unigrams_limit=8,
-        word_bigrams_limit=0,
-        char_trigrams_limit=0,
-        num_oov_tokens=150000)
+    conf = OmegaConf.load(config_file)
 
-    model = prepare_model(model_config, model_path, from_checkpoint=False)
+    model = setup_model(conf)
+    vectorizer = setup_vectorizer(conf)
 
-    # recall_validation(candidates_path,
-    #                   queries_path,
-    #                   vectorizer=vectorizer,
-    #                   embedding_dim=128,
-    #                   similarity_metric=SimilarityMetric.COSINE,
-    #                   model=model,
-    #                   embedding_batch_size=4096,
-    #                   k=1024,
-    #                   query_batch_size=128,
-    #                   visualize_path="tensorboard/embeddings",
-    #                   device=torch.device("cpu")
-    #                   )
+    model = prepare_model(model, model_path, from_checkpoint=True)
 
-    interactive_search(
-        candidates_path,
-        num_embeddings=model_config.num_embeddings,
-        embedding_dim=128,
-        similarity_metric=SimilarityMetric.COSINE,
-        model=model,
-        embedding_batch_size=4096,
-        k=30,
-        query_batch_size=128,
-        device=torch.device("cpu"),
-        vectorizer=vectorizer
-    )
+    recall_validation(candidates_path,
+                      queries_path,
+                      vectorizer=vectorizer,
+                      embedding_dim=128,
+                      similarity_metric=SimilarityMetric.COSINE,
+                      model=model,
+                      embedding_batch_size=4096,
+                      k=1024,
+                      query_batch_size=128,
+                      visualize_path="tensorboard/embeddings",
+                      device=torch.device("cpu")
+                      )
+
+    # interactive_search(
+    #     candidates_path,
+    #     embedding_dim=conf.model.output_dim,
+    #     similarity_metric=SimilarityMetric.COSINE,
+    #     model=model,
+    #     embedding_batch_size=4096,
+    #     k=30,
+    #     query_batch_size=128,
+    #     device=torch.device("cpu"),
+    #     vectorizer=vectorizer
+    # )
