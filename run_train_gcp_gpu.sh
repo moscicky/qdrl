@@ -6,7 +6,7 @@ REPLICA_COUNT=1
 GPU_CARD="NVIDIA_TESLA_T4"
 GPU_COUNT=1
 
-NAME="parquet_test_min_3_product_offers"
+NAME="two_tower"
 
 DISPLAY_NAME="${NAME}_$(date +'%Y_%m_%dT%H_%M')"
 
