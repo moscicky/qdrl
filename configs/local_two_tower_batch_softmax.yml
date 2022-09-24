@@ -1,0 +1,29 @@
+task_id: "local_runs"
+run_id: "two_tower_batch_softmax"
+num_epochs: 5
+dataset_dir: "datasets/local_parquet"
+commit_hash: "whatever"
+batch_size: 64
+learning_rate: 1e-2
+reuse_epoch: True
+dataloader_workers: 4
+loss:
+  type: batch_softmax
+  batch_size: 64
+negatives:
+  type: batch
+text_vectorizer:
+  type: dictionary
+  dictionary_path: datasets/local/token_dictionary_150k_0k_0k
+  word_unigrams_limit: 8
+  word_bigrams_limit: 0
+  char_trigrams_limit: 0
+  num_oov_tokens: 50000
+model:
+  type: TwoTower
+  text_embedding:
+    num_embeddings: 200000
+    embedding_dim: 256
+  fc_dim: 128
+  output_dim: 128
+validate_recall: False
