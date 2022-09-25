@@ -354,8 +354,8 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    config_file = "models/two_tower/config.yaml"
-    model_path = 'models/two_tower/model.pth'
+    config_file = "local_runs/multi_modal/config.yaml"
+    model_path = 'local_runs/multi_modal/models/model_weights.pth'
 
     candidates_path = 'datasets/local_parquet/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local_parquet/recall_validation_queries_dataset/queries.json'
