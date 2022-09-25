@@ -1,13 +1,12 @@
-import csv
 import os
-from typing import List, Callable, Optional
+from typing import List
 
 import pandas as pd
 import torch
-from torch.utils.data.dataset import T_co, Dataset, IterableDataset
+from torch.utils.data.dataset import T_co, IterableDataset
 
-from qdrl.configs import CategoricalFeature
 from qdrl.preprocess import TextVectorizer, clean_phrase
+from qdrl.setup import Features
 
 
 def _read_jsonl(path: str, cols: List[str]) -> pd.DataFrame:
@@ -41,11 +40,9 @@ def _read_csv(path: str, cols: List[str]) -> pd.DataFrame:
 
 
 def _prepare_dataset(path: str,
-                     cols: List[str],
                      type: str,
                      vectorizer: TextVectorizer,
-                     text_cols: List[str],
-                     categorical_feature: Optional[CategoricalFeature]) -> pd.DataFrame:
+                     features: Features) -> pd.DataFrame:
     if type == 'csv':
         reader = _read_csv
     elif type == 'json':
@@ -55,67 +52,55 @@ def _prepare_dataset(path: str,
     else:
         raise ValueError(f"Unknown type: {type}")
     print(f"Reading dataset: {path}")
-    df = reader(path, cols).astype('str')
-    df[text_cols] = df[text_cols].applymap(lambda c: clean_phrase(c))
-    df[text_cols] = df[text_cols].applymap(lambda c: vectorizer.vectorize(c))
-    if categorical_feature:
-        df[[categorical_feature.name]] = df[[categorical_feature]].applymap(lambda c: categorical_feature.mapper.map(c))
+    all_features = features.product_features + features.query_features
+    df = reader(path, all_features).astype('str')
+    df[features.text_features] = df[features.text_features].applymap(lambda c: clean_phrase(c))
+    df[features.text_features] = df[features.text_features].applymap(lambda c: vectorizer.vectorize(c))
+    for cf in features.categorical_features:
+        df[[cf.name]] = df[[cf.name]].applymap(lambda c: cf.mapper.map(c))
     return df
 
 
 class LazyTextDataset(IterableDataset):
     def __init__(self, path: str,
-                 query_features: List[str],
-                 product_features: List[str],
-                 text_features: List[str],
                  vectorizer: TextVectorizer,
-                 categorical_feature: Optional[CategoricalFeature]
+                 features: Features
                  ):
         self.path = path
         self.vectorizer = vectorizer
-        self.query_features = query_features
-        self.product_features = product_features
-        self.cols = query_features + product_features
-        self.text_features = text_features
-        self.categorical_feature = categorical_feature
+        self.features = features
 
     def __iter__(self):
         ds = _prepare_dataset(self.path,
-                              cols=self.cols,
                               type='parquet',
                               vectorizer=self.vectorizer,
-                              text_cols=self.text_features,
-                              categorical_feature=self.categorical_feature
+                              features=self.features
                               )
         for row in ds.iterrows():
             yield {
-                "query": {f: torch.tensor(row[1][f]) for f in self.query_features},
-                "product": {f: torch.tensor(row[1][f]) for f in self.product_features}
+                "query": {f: torch.tensor(row[1][f]) for f in self.features.query_features},
+                "product": {f: torch.tensor(row[1][f]) for f in self.features.product_features}
             }
 
 
-class ItemsDataset:
-    def __init__(self, path: str, cols: List[str], vectorizer: TextVectorizer):
-        self.df = _prepare_dataset(path, cols, 'csv', vectorizer)
-
-    def take(self, n: int) -> pd.DataFrame:
-        return self.df.sample(n=n)
+# class ItemsDataset:
+#     def __init__(self, path: str, cols: List[str], vectorizer: TextVectorizer):
+#         self.df = _prepare_dataset(path, cols, 'csv', vectorizer)
+#
+#     def take(self, n: int) -> pd.DataFrame:
+#         return self.df.sample(n=n)
 
 
 class ChunkingDataset(IterableDataset):
-    def __init__(self, dataset_dir_path: str,
-                 query_features: List[str],
-                 product_features: List[str],
-                 text_features: List[str],
+    def __init__(self,
+                 dataset_dir_path: str,
                  vectorizer: TextVectorizer,
-                 categorical_feature: Optional[CategoricalFeature]):
+                 features: Features
+                 ):
         super(ChunkingDataset, self).__init__()
         self.dataset_dir_path = dataset_dir_path
-        self.query_features = query_features
-        self.product_features = product_features
-        self.text_features = text_features
-        self.categorical_feature = categorical_feature
         self.vectorizer = vectorizer
+        self.features = features
 
     def __iter__(self):
         worker_info = torch.utils.data.get_worker_info()
@@ -132,11 +117,8 @@ class ChunkingDataset(IterableDataset):
             path = os.path.join(self.dataset_dir_path, f)
             dss.append(LazyTextDataset(
                 path=path,
-                query_features=self.query_features,
-                product_features=self.product_features,
-                text_features=self.text_features,
                 vectorizer=self.vectorizer,
-                categorical_feature=self.categorical_feature
+                features=self.features
             ))
         return dss
 

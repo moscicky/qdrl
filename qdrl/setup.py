@@ -1,11 +1,61 @@
+import dataclasses
+from typing import List
+
 from omegaconf import DictConfig
 from torch import nn
 
 from qdrl.batch_softmax_cross_entropy_loss import BatchSoftmaxCrossEntropyLossComputer
 from qdrl.loss_computer import LossComputer
-from qdrl.models import SimpleTextEncoder, TwoTower
-from qdrl.preprocess import TextVectorizer, DictionaryLoaderTextVectorizer
+from qdrl.models import SimpleTextEncoder, TwoTower, MultiModalTwoTower
+from qdrl.preprocess import TextVectorizer, DictionaryLoaderTextVectorizer, CategoricalFeatureMapper
 from qdrl.triplet_loss import BatchTripletLossComputer
+
+
+@dataclasses.dataclass
+class CategoricalFeature:
+    name: str
+    mapper: CategoricalFeatureMapper
+
+
+@dataclasses.dataclass
+class Features:
+    product_features: List[str]
+    query_features: List[str]
+    text_features: List[str]
+    categorical_features: List[CategoricalFeature]
+
+
+def parse_features(config: DictConfig) -> Features:
+    query_features = []
+    product_features = []
+    text_features = []
+    categorical_features = []
+
+    def parse(config: List[DictConfig], features: List[str], text_features: List[str],
+              categorical_features: List[CategoricalFeature]):
+        for feature in config:
+            features.append(feature.name)
+            if feature.type == "text":
+                text_features.append(feature.name)
+            elif feature.type == "categorical":
+                mapper = CategoricalFeatureMapper(feature.dictionary_path, feature.num_oov_categories)
+                cf = CategoricalFeature(
+                    name=feature.name,
+                    mapper=mapper
+                )
+                categorical_features.append(cf)
+            else:
+                raise ValueError(f"Unknown feature type: {feature.type}")
+
+    parse(config.dataset.query_features, query_features, text_features, categorical_features)
+    parse(config.dataset.product_features, product_features, text_features, categorical_features)
+
+    return Features(
+        product_features=product_features,
+        query_features=query_features,
+        text_features=text_features,
+        categorical_features=categorical_features,
+    )
 
 
 def setup_vectorizer(config: DictConfig) -> TextVectorizer:
@@ -23,20 +73,37 @@ def setup_vectorizer(config: DictConfig) -> TextVectorizer:
 
 
 def setup_model(config: DictConfig) -> nn.Module:
-    if config.model.type == "SimpleTextEncoder":
-        c = config.model
+    c = config.model
+    if c.type == "SimpleTextEncoder":
         model = SimpleTextEncoder(
             num_embeddings=c.text_embedding.num_embeddings,
             embedding_dim=c.text_embedding.embedding_dim,
             fc_dim=c.fc_dim,
-            output_dim=c.output_dim)
+            output_dim=c.output_dim,
+            query_text_feature=c.query.text_feature,
+            product_text_feature=c.product.text_feature
+        )
         return model
-    if config.model.type == "TwoTower":
-        c = config.model
+    elif c.type == "TwoTower":
         model = TwoTower(
             num_embeddings=c.text_embedding.num_embeddings,
             text_embedding_dim=c.text_embedding.embedding_dim,
-            output_dim=c.output_dim
+            output_dim=c.output_dim,
+            query_text_feature=c.query.text_feature,
+            product_text_feature=c.product.text_feature
+        )
+        return model
+    elif c.type == "MultiModalTwoTower":
+        model = MultiModalTwoTower(
+            num_embeddings=c.text_embedding.num_embeddings,
+            text_embedding_dim=c.text_embedding.embedding_dim,
+            category_embedding_dim=c.category_feature.embedding_dim,
+            category_num_embeddings=c.category_feature.num_embeddings,
+            fc_dim=c.fc_dim,
+            output_dim=c.output_dim,
+            query_text_feature=c.query.text_feature,
+            product_text_feature=c.product.text_feature,
+            product_categorical_feature=c.product.categorical_feature
         )
         return model
     else:

@@ -16,7 +16,7 @@ from qdrl.loss_computer import LossComputer
 from qdrl.loss_validator import LossValidator
 from qdrl.preprocess import TextVectorizer
 from qdrl.recall_validator import RecallValidator
-from qdrl.setup import setup_vectorizer, setup_loss, setup_model
+from qdrl.setup import setup_vectorizer, setup_loss, setup_model, parse_features, Features
 
 
 def train(
@@ -87,8 +87,8 @@ def init_task_dir(task_id: str, run_id: str, conf: DictConfig):
             OmegaConf.save(config=conf, f=mf)
 
 
-def dataset_factory(cols: List[str], vectorizer: TextVectorizer) -> Callable[[str], ChunkingDataset]:
-    return lambda p: ChunkingDataset(p, cols=cols, vectorizer=vectorizer)
+def dataset_factory(vectorizer: TextVectorizer, features: Features) -> Callable[[str], ChunkingDataset]:
+    return lambda p: ChunkingDataset(p, vectorizer, features)
 
 def main(
         config: DictConfig
@@ -104,9 +104,10 @@ def main(
     model_output_path = os.path.join(model_output_dir_path, "model_weights.pth")
     checkpoints_path = os.path.join(checkpoint_dir_path, "checkpoint")
 
+    features = parse_features(config)
     vectorizer = setup_vectorizer(config)
 
-    dataset_fn = dataset_factory(cols=conf.features, vectorizer=vectorizer)
+    dataset_fn = dataset_factory(vectorizer=vectorizer, features=features)
     training_dataset = dataset_fn(os.path.join(config.dataset_dir, "training_dataset"))
     validation_dataset = dataset_fn(os.path.join(config.dataset_dir, "validation_dataset"))
 
