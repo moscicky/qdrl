@@ -38,12 +38,12 @@ model:
     num_embeddings: 200000
     embedding_dim: 256
   category_feature:
-    num_embeddings: 230000
+    num_embeddings: 23000
     embedding_dim: 32
   fc_dim: 128
   output_dim: 128
   query:
-    text_feature: "product_name"
+    text_feature: "query_search_phrase"
   product:
     text_feature: "product_name"
     categorical_feature: "product_category_id"

@@ -137,7 +137,7 @@ class MultiModalTwoTower(nn.Module):
         )
 
         self.product_fc = nn.Sequential(
-            nn.Linear(in_features=num_embeddings + category_num_embeddings, out_features=fc_dim),
+            nn.Linear(in_features=text_embedding_dim + category_embedding_dim, out_features=fc_dim),
             nn.ReLU(),
             nn.Linear(in_features=fc_dim, out_features=output_dim)
         )
@@ -149,6 +149,6 @@ class MultiModalTwoTower(nn.Module):
         t = self.text_embedding(text)
         c = self.category_embedding(category)
 
-        combined = torch.cat(t, c)
+        combined = torch.cat((t, c), 1)
 
         return self.product_fc(combined)

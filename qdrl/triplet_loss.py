@@ -1,4 +1,4 @@
-from typing import Tuple, List, Dict
+from typing import List, Dict
 
 import torch
 from torch import nn

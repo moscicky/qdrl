@@ -57,7 +57,7 @@ def _prepare_dataset(path: str,
     df[features.text_features] = df[features.text_features].applymap(lambda c: clean_phrase(c))
     df[features.text_features] = df[features.text_features].applymap(lambda c: vectorizer.vectorize(c))
     for cf in features.categorical_features:
-        df[[cf.name]] = df[[cf.name]].applymap(lambda c: cf.mapper.map(c))
+        df[[cf.name]] = df[[cf.name]].applymap(lambda c: cf.mapper.map(c)).astype('int')
     return df
 
 
