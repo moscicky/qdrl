@@ -166,7 +166,8 @@ def main(
         embedding_batch_size=4096,
         k=1024,
         query_batch_size=128,
-        device=device
+        device=device,
+        features=features
     )
 
     train(
