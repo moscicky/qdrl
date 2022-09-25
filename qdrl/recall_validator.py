@@ -1,3 +1,4 @@
+import itertools
 import json
 import os
 from typing import Dict, List, Optional
@@ -8,11 +9,12 @@ import torch
 from omegaconf import OmegaConf
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.data import default_collate
 
 from qdrl.configs import SimilarityMetric
-from qdrl.models import TwoTower
+from qdrl.models import TwoTower, SimpleTextEncoder, MultiModalTwoTower
 from qdrl.preprocess import clean_phrase, TextVectorizer
-from qdrl.setup import setup_model, setup_vectorizer
+from qdrl.setup import setup_model, setup_vectorizer, Features, parse_features
 
 
 def prepare_model(
@@ -50,33 +52,66 @@ def vectorize(texts: List[str],
     return np.array(vectorized)
 
 
-def embed(texts: np.ndarray, model: nn.Module, batch_size: int, device: torch.device,
-          tower: str = "none") -> np.ndarray:
+def batch(iterable, n=1):
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx:min(ndx + n, l)]
+
+
+def embed_candidates(
+        candidates: List[Dict],
+        model: nn.Module,
+        batch_size: int,
+        device: torch.device
+):
     model.eval()
-    idx = 0
-    cnt = texts.shape[0]
-    embeddings = []
-    batches = cnt / batch_size
     batch_idx = 0
+    embeddings = []
+    batches = len(candidates) / batch_size
     checkpoints = [batches // 10 * i for i in range(0, 10)]
-
-    while idx < cnt:
+    for b in batch(candidates, batch_size):
         if batch_idx in checkpoints:
-            print(f"processed {(batch_idx / batches) * 100} % batches")
-        batch = texts[idx:idx + batch_size, :]
-        batch_tensor = torch.from_numpy(batch).to(device)
-        with torch.no_grad():
-            if tower == "query":
-                t = model.forward_query(batch_tensor)
-            elif tower == "product":
-                t = model.forward_product(batch_tensor)
-            else:
-                t = model(batch_tensor)
-            text_embedded = t.detach().cpu().numpy()
-        embeddings.append(text_embedded)
-        idx += batch_size
+            print(f"Embedded {(batch_idx / batches) * 100} % candidate batches")
+        collated = default_collate(b)
+        if isinstance(model, SimpleTextEncoder):
+            embedded = model.forward(collated[model.product_text_feature].to(device))
+        elif isinstance(model, TwoTower):
+            embedded = model.forward_product(collated[model.product_text_feature].to(device))
+        elif isinstance(model, MultiModalTwoTower):
+            embedded = model.forward_product(text=collated[model.product_text_feature].to(device),
+                                             category=collated[model.product_categorical_feature].to(device))
+        else:
+            raise ValueError("Model type not supported")
         batch_idx += 1
+        embeddings.append(embedded.detach().cpu().numpy())
+    return np.vstack(embeddings)
 
+
+def embed_queries(
+        queries: List[Dict],
+        model: nn.Module,
+        batch_size: int,
+        device: torch.device
+):
+    model.eval()
+    batch_idx = 0
+    embeddings = []
+    batches = len(queries) / batch_size
+    checkpoints = [batches // 10 * i for i in range(0, 10)]
+    for b in batch(queries, batch_size):
+        if batch_idx in checkpoints:
+            print(f"Embedded {(batch_idx / batches) * 100} % query batches")
+        collated = default_collate(b)
+        if isinstance(model, SimpleTextEncoder):
+            embedded = model.forward(collated[model.query_text_feature].to(device))
+        elif isinstance(model, TwoTower):
+            embedded = model.forward_query(collated[model.query_text_feature].to(device))
+        elif isinstance(model, MultiModalTwoTower):
+            embedded = model.forward_query(text=collated[model.query_text_feature].to(device))
+        else:
+            raise ValueError("Model type not supported")
+        batch_idx += 1
+        embeddings.append(embedded.detach().cpu().numpy())
     return np.vstack(embeddings)
 
 
@@ -118,7 +153,7 @@ def search(embeddings: np.ndarray, batch_size: int, similarity_metric: Similarit
 
     while idx < cnt:
         if batch_idx in checkpoints:
-            print(f"processed {(batch_idx / batches) * 100} % batches")
+            print(f"finished searching for {(batch_idx / batches) * 100} % batches")
         batch = embeddings[idx:idx + batch_size, :]
         _, ids = execute_query(batch, similarity_metric=similarity_metric, index=index, k=k)
         query_results.append(ids)
@@ -128,16 +163,38 @@ def search(embeddings: np.ndarray, batch_size: int, similarity_metric: Similarit
     return np.vstack(query_results)
 
 
-def candidates_index(candidates_path: str, vectorizer: TextVectorizer, embedding_dim: int,
-                     embedding_batch_size: int, similarity_metric: SimilarityMetric, model: nn.Module,
+def parse_rows(
+        rows: List[Dict],
+        wanted_features: List[str],
+        features: Features,
+        vectorizer: TextVectorizer) -> List[Dict]:
+    parsed = []
+    text_features = [f for f in wanted_features if f in features.text_features]
+    categorical_features = [cf for cf in features.categorical_features if cf.name in wanted_features]
+    for row in rows:
+        c = {}
+        for text_feature in text_features:
+            c[text_feature] = np.array(vectorizer.vectorize(row[text_feature]), dtype="int")
+        for categorical_feature in categorical_features:
+            c[categorical_feature.name] = np.array(categorical_feature.mapper.map(row[categorical_feature.name]), dtype="int")
+        parsed.append(c)
+    return parsed
+
+
+def candidates_index(candidates_path: str,
+                     features: Features,
+                     vectorizer: TextVectorizer,
+                     embedding_dim: int,
+                     embedding_batch_size: int,
+                     similarity_metric: SimilarityMetric,
+                     model: nn.Module,
                      device: torch.device):
     candidates = load_candidates(candidates_path)
     candidates_by_product_id = {v["product_id"]: k for k, v in candidates.items()}
     print("Loaded candidates")
-    candidates_vectorized = vectorize([c["product_name"] for c in candidates.values()], vectorizer)
+    candidates_parsed = parse_rows(candidates.values(), features.product_features, features, vectorizer)
     print("Vectorized candidates")
-    tower = "product" if isinstance(model, TwoTower) else "none"
-    candidate_embeddings = embed(candidates_vectorized, model, batch_size=embedding_batch_size, device=device, tower=tower)
+    candidate_embeddings = embed_candidates(candidates_parsed, model, embedding_batch_size, device)
     print("Embedded candidates")
     index = create_index(embedding_dim, candidate_embeddings, similarity_metric)
     print("Created candidates index")
@@ -182,6 +239,7 @@ def calculate_recall(query_results: np.ndarray, queries: List[Dict],
 
 
 def interactive_search(candidates_path: str,
+                       features: Features,
                        vectorizer: TextVectorizer,
                        embedding_dim: int,
                        embedding_batch_size: int,
@@ -192,6 +250,7 @@ def interactive_search(candidates_path: str,
                        device: torch.device):
     index, candidates_by_product_id, candidates, _ = candidates_index(
         candidates_path=candidates_path,
+        features=features,
         vectorizer=vectorizer,
         embedding_dim=embedding_dim,
         embedding_batch_size=embedding_batch_size,
@@ -202,9 +261,9 @@ def interactive_search(candidates_path: str,
 
     while True:
         query = input("Type your query: \n")
-        query_vectorized = vectorize([query], vectorizer)
-        tower = "query" if isinstance(model, TwoTower) else "none"
-        query_embeddings = embed(query_vectorized, model, batch_size=embedding_batch_size, device=device, tower=tower)
+        query_dict = { "query_search_phrase": query }
+        query_parsed = parse_rows([query_dict], features.query_features, features, vectorizer)
+        query_embeddings = embed_queries(query_parsed, model, batch_size=embedding_batch_size, device=device)
         query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
         for query_result in query_results.tolist():
             for result_idx, result in enumerate(query_result):
@@ -214,6 +273,7 @@ def interactive_search(candidates_path: str,
 def recall_validation(
         candidates_path: str,
         queries_path: str,
+        features: Features,
         vectorizer: TextVectorizer,
         embedding_dim: int,
         embedding_batch_size: int,
@@ -226,6 +286,7 @@ def recall_validation(
 ):
     index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
         candidates_path=candidates_path,
+        features=features,
         vectorizer=vectorizer,
         embedding_dim=embedding_dim,
         embedding_batch_size=embedding_batch_size,
@@ -236,10 +297,9 @@ def recall_validation(
 
     queries = load_queries(queries_path)
     print("Loaded queries")
-    queries_vectorized = vectorize([q["query_search_phrase"] for q in queries], vectorizer)
+    queries_parsed = parse_rows(queries, features.query_features, features, vectorizer)
     print("Vectorized queries")
-    tower = "query" if isinstance(model, TwoTower) else "none"
-    query_embeddings = embed(queries_vectorized, model, batch_size=embedding_batch_size, device=device, tower=tower)
+    query_embeddings = embed_queries(queries_parsed, model, batch_size=embedding_batch_size, device=device)
     print("Embedded queries")
     query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
     print("Executed queries")
@@ -256,6 +316,7 @@ class RecallValidator:
     def __init__(self,
                  candidates_path: str,
                  queries_path: str,
+                 features: Features,
                  vectorizer: TextVectorizer,
                  embedding_dim: int,
                  embedding_batch_size: int,
@@ -273,6 +334,7 @@ class RecallValidator:
         self.k = k
         self.device = device
         self.vectorizer = vectorizer
+        self.features = features
 
     def validate(self, model: nn.Module):
         return recall_validation(
@@ -285,14 +347,15 @@ class RecallValidator:
             k=self.k,
             query_batch_size=self.query_batch_size,
             device=self.device,
-            vectorizer=self.vectorizer
+            vectorizer=self.vectorizer,
+            features=self.features
         )
 
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    config_file = "local_runs/two_tower/config.yaml"
-    model_path = 'local_runs/two_tower/checkpoints/checkpoint'
+    config_file = "models/parquet/config.yaml"
+    model_path = 'models/parquet/model.pth'
 
     candidates_path = 'datasets/local_parquet/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local_parquet/recall_validation_queries_dataset/queries.json'
@@ -302,10 +365,12 @@ if __name__ == '__main__':
     model = setup_model(conf)
     vectorizer = setup_vectorizer(conf)
 
-    model = prepare_model(model, model_path, from_checkpoint=True)
+    model = prepare_model(model, model_path, from_checkpoint=False)
+    features = parse_features(conf)
 
     recall_validation(candidates_path,
                       queries_path,
+                      features=features,
                       vectorizer=vectorizer,
                       embedding_dim=128,
                       similarity_metric=SimilarityMetric.COSINE,
@@ -326,5 +391,6 @@ if __name__ == '__main__':
     #     k=30,
     #     query_batch_size=128,
     #     device=torch.device("cpu"),
-    #     vectorizer=vectorizer
+    #     vectorizer=vectorizer,
+    #     features=features
     # )
