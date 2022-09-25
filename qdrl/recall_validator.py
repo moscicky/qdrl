@@ -174,7 +174,7 @@ def parse_rows(
     for row in rows:
         c = {}
         for text_feature in text_features:
-            c[text_feature] = np.array(vectorizer.vectorize(row[text_feature]), dtype="int")
+            c[text_feature] = np.array(vectorize_text(vectorizer, (row[text_feature])), dtype="int")
         for categorical_feature in categorical_features:
             c[categorical_feature.name] = np.array(categorical_feature.mapper.map(row[categorical_feature.name]), dtype="int")
         parsed.append(c)
@@ -354,8 +354,8 @@ class RecallValidator:
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    config_file = "models/parquet/config.yaml"
-    model_path = 'models/parquet/model.pth'
+    config_file = "models/two_tower/config.yaml"
+    model_path = 'models/two_tower/model.pth'
 
     candidates_path = 'datasets/local_parquet/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local_parquet/recall_validation_queries_dataset/queries.json'
