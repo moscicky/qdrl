@@ -1,6 +1,6 @@
 task_id: "local_runs"
 run_id: "multi_modal"
-num_epochs: 5
+num_epochs: 1
 dataset_dir: "datasets/docker_parquet"
 commit_hash: "whatever"
 batch_size: 64
@@ -16,7 +16,7 @@ dataset:
       type: "text"
     - name: "product_category_id"
       type: "categorical"
-      dictionary_path: "datasets/local_parquet/categories"
+      dictionary_path: "datasets/docker_parquet/categories"
       num_oov_categories: 23
 loss:
   type: triplet
