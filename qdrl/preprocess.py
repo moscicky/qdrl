@@ -153,3 +153,30 @@ def clean_phrase(text: str) -> str:
                                     )
 
     return clean_pattern.sub("", decoded.lower()).strip()
+
+
+class CategoricalFeatureMapper:
+    def __init__(self,
+                 dictionary_path: str,
+                 num_oov_features: int
+                 ):
+
+        self.dictionary = self.load_dictionary(dictionary_path)
+        self.num_known_features = len(self.dictionary)
+        self.num_oov_features = num_oov_features
+
+    def load_dictionary(self, path) -> Dict[str, int]:
+        dictionary = {}
+        with open(f"{path}/dictionary.json") as f:
+            for line in f:
+                json_line = json.loads(line)
+                value = json_line["value"]
+                value_id = json_line["value_id"]
+                dictionary[value] = value_id
+        return dictionary
+
+    def map(self, value: str) -> int:
+        if value in self.dictionary:
+            return self.dictionary[value]
+        else:
+            return int(md5(value.encode('utf-8')).hexdigest(), 16) % (self.num_oov_features - 1) + self.num_known_features + 1

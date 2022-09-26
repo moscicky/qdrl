@@ -1,12 +1,11 @@
-from typing import Tuple, List
+from typing import List, Dict
 
 import torch
 from torch import nn
 import torch.nn.functional as F
 
+from qdrl.batch_predictor import predict
 from qdrl.loss_computer import LossComputer
-from qdrl.models import TwoTower
-
 
 class BatchNegativeTripletsAssembler:
     def __init__(self, batch_size: int, negatives_count: int):
@@ -15,19 +14,12 @@ class BatchNegativeTripletsAssembler:
 
     def generate_triplets(self,
                           model: nn.Module,
-                          batch: Tuple[torch.tensor, ...],
+                          batch: Dict[str, torch.Tensor],
                           device: torch.device
                           ) -> [torch.tensor,
                                 torch.tensor,
                                 torch.tensor]:
-        anchor, positive = batch[0].to(device), batch[1].to(device)
-
-        if isinstance(model, TwoTower):
-            anchor_out = model.forward_query(anchor)
-            positive_out = model.forward_product(positive)
-        else:
-            anchor_out = model(anchor)
-            positive_out = model(positive)
+        anchor_out, positive_out = predict(model, batch, device)
 
         anchor = anchor_out[self.anchor_mask]
         positive = positive_out[self.positive_mask]
@@ -58,7 +50,7 @@ class BatchTripletLossComputer(LossComputer):
         self.loss = nn.TripletMarginWithDistanceLoss(distance_function=lambda x, y: 1.0 - F.cosine_similarity(x, y),
                                                      margin=loss_margin)
 
-    def compute(self, model: nn.Module, batch: Tuple[torch.tensor, ...], device: torch.device) -> torch.tensor:
+    def compute(self, model: nn.Module, batch: Dict[str, torch.Tensor], device: torch.device) -> torch.tensor:
         anchor, positive, negative = self.triplet_assembler.generate_triplets(model, batch, device)
         loss = self.loss(anchor=anchor, positive=positive, negative=negative)
         return loss

@@ -1,12 +1,12 @@
 EXECUTOR_IMAGE_URI="europe-docker.pkg.dev/vertex-ai/training/pytorch-gpu.1-11:latest"
 WORKING_DIRECTORY="."
 PYTHON_MODULE="qdrl.main_train"
-NAME="two_tower"
+NAME="multi_modal"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
 
 DISPLAY_NAME="${NAME}_${RUN_ID}"
 EXTRA_DIRS="datasets/docker,datasets/docker_parquet,configs"
-CONFIG="docker_two_tower.yml"
+CONFIG="docker_multi_modal.yml"
 
 # build image which will be pushed to gcr
 if [[ -z "${PROJECT}" ]]; then
