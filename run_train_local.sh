@@ -1,7 +1,7 @@
 EXECUTOR_IMAGE_URI="europe-docker.pkg.dev/vertex-ai/training/pytorch-gpu.1-11:latest"
 WORKING_DIRECTORY="."
 PYTHON_MODULE="qdrl.main_train"
-NAME="multi_modal"
+NAME="multi_recall"
 RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
 
 DISPLAY_NAME="${NAME}_${RUN_ID}"

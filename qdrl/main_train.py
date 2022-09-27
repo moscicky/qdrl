@@ -10,12 +10,11 @@ from torch import optim
 
 from qdrl.args import get_args
 from qdrl.checkpoints import save_checkpoint
-from qdrl.configs import SimilarityMetric
 from qdrl.loader import ChunkingDataset
 from qdrl.loss_computer import LossComputer
 from qdrl.loss_validator import LossValidator
 from qdrl.preprocess import TextVectorizer
-from qdrl.recall_validator import RecallValidator
+from qdrl.recall_validator import RecallValidator, setup_recall_validator
 from qdrl.setup import setup_vectorizer, setup_loss, setup_model, parse_features, Features
 
 
@@ -64,8 +63,9 @@ def train(
         if recall_validator:
             print("Starting recall validation")
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-            recall = recall_validator.validate(model)
-            tensorboard_writer.add_scalar("Recall/valid", recall, epoch)
+            recalls = recall_validator.validate(model)
+            for k, recall in recalls.items():
+                tensorboard_writer.add_scalar(f"Recall@{k}/valid", recall, epoch)
 
 
 def init_directories(paths: List[str]):
@@ -89,6 +89,7 @@ def init_task_dir(task_id: str, run_id: str, conf: DictConfig):
 
 def dataset_factory(vectorizer: TextVectorizer, features: Features) -> Callable[[str], ChunkingDataset]:
     return lambda p: ChunkingDataset(p, vectorizer, features)
+
 
 def main(
         config: DictConfig
@@ -157,15 +158,9 @@ def main(
         device=device
     )
 
-    recall_validator = RecallValidator(
-        candidates_path=os.path.join(conf.dataset_dir, "recall_validation_items_dataset", "items.json"),
-        queries_path=os.path.join(conf.dataset_dir, "recall_validation_queries_dataset", "queries.json"),
+    recall_validator = setup_recall_validator(
+        config=conf,
         vectorizer=vectorizer,
-        embedding_dim=config.model.output_dim,
-        similarity_metric=SimilarityMetric.COSINE,
-        embedding_batch_size=4096,
-        k=1024,
-        query_batch_size=128,
         device=device,
         features=features
     )
@@ -181,7 +176,7 @@ def main(
         checkpoints_path=checkpoints_path,
         tensorboard_writer=tensorboard_writer,
         loss_validator=validator,
-        recall_validator=recall_validator if config.validate_recall else None
+        recall_validator=recall_validator
     )
     print("Training finished, saving the model from last epoch...")
 

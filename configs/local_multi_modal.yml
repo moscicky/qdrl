@@ -47,4 +47,10 @@ model:
   product:
     text_feature: "product_name"
     categorical_feature: "product_category_id"
-validate_recall: False
+recall_validation:
+  enabled: False
+  k:
+    - 10
+    - 60
+    - 100
+    - 1024
