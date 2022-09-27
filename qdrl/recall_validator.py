@@ -1,4 +1,3 @@
-import itertools
 import json
 import os
 from typing import Dict, List, Optional
@@ -6,15 +5,15 @@ from typing import Dict, List, Optional
 import faiss
 import numpy as np
 import torch
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from torch import nn
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import default_collate
 
-from qdrl.configs import SimilarityMetric
+from qdrl.configs import SimilarityMetric, Features
 from qdrl.models import TwoTower, SimpleTextEncoder, MultiModalTwoTower
 from qdrl.preprocess import clean_phrase, TextVectorizer
-from qdrl.setup import setup_model, setup_vectorizer, Features, parse_features
+from qdrl.setup import setup_model, setup_vectorizer, parse_features
 
 
 def prepare_model(
@@ -176,7 +175,8 @@ def parse_rows(
         for text_feature in text_features:
             c[text_feature] = np.array(vectorize_text(vectorizer, (row[text_feature])), dtype="int")
         for categorical_feature in categorical_features:
-            c[categorical_feature.name] = np.array(categorical_feature.mapper.map(row[categorical_feature.name]), dtype="int")
+            c[categorical_feature.name] = np.array(categorical_feature.mapper.map(row[categorical_feature.name]),
+                                                   dtype="int")
         parsed.append(c)
     return parsed
 
@@ -261,7 +261,7 @@ def interactive_search(candidates_path: str,
 
     while True:
         query = input("Type your query: \n")
-        query_dict = { "query_search_phrase": query }
+        query_dict = {"query_search_phrase": query}
         query_parsed = parse_rows([query_dict], features.query_features, features, vectorizer)
         query_embeddings = embed_queries(query_parsed, model, batch_size=embedding_batch_size, device=device)
         query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
@@ -279,11 +279,11 @@ def recall_validation(
         embedding_batch_size: int,
         query_batch_size: int,
         similarity_metric: SimilarityMetric,
-        k: int,
+        ks: List[int],
         model: nn.Module,
         device: torch.device,
         visualize_path: Optional[str] = None
-):
+) -> Dict[int, float]:
     index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
         candidates_path=candidates_path,
         features=features,
@@ -301,15 +301,18 @@ def recall_validation(
     print("Vectorized queries")
     query_embeddings = embed_queries(queries_parsed, model, batch_size=embedding_batch_size, device=device)
     print("Embedded queries")
-    query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
-    print("Executed queries")
-    recall = calculate_recall(query_results, queries, candidates_by_product_id)
-    print(f"Average recall@{k}: {recall}")
+    recalls = {}
+    for k in ks:
+        query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
+        print("Executed queries")
+        recall = calculate_recall(query_results, queries, candidates_by_product_id)
+        recalls[k] = recall
+        print(f"Average recall@{k}: {recall}")
     if visualize_path:
         write_embeddings(visualize_path, candidates, candidate_embeddings)
         print("Saved embedding visualization")
 
-    return recall
+    return recalls
 
 
 class RecallValidator:
@@ -322,7 +325,7 @@ class RecallValidator:
                  embedding_batch_size: int,
                  query_batch_size: int,
                  similarity_metric: SimilarityMetric,
-                 k: int,
+                 k: List[int],
                  device: torch.device
                  ):
         self.candidates_path = candidates_path
@@ -344,7 +347,7 @@ class RecallValidator:
             similarity_metric=self.similarity_metric,
             model=model,
             embedding_batch_size=self.embedding_batch_size,
-            k=self.k,
+            ks=self.k,
             query_batch_size=self.query_batch_size,
             device=self.device,
             vectorizer=self.vectorizer,
@@ -352,10 +355,30 @@ class RecallValidator:
         )
 
 
+def setup_recall_validator(config: DictConfig, vectorizer: TextVectorizer, device: torch.device, features: Features) -> \
+        Optional[RecallValidator]:
+    if not config.recall_validation.enabled:
+        print("Skipping recall validation")
+        return None
+    else:
+        return RecallValidator(
+            candidates_path=os.path.join(config.dataset_dir, "recall_validation_items_dataset", "items.json"),
+            queries_path=os.path.join(config.dataset_dir, "recall_validation_queries_dataset", "queries.json"),
+            vectorizer=vectorizer,
+            embedding_dim=config.model.output_dim,
+            similarity_metric=SimilarityMetric.COSINE,
+            embedding_batch_size=4096,
+            k=config.recall_validation.k,
+            query_batch_size=128,
+            device=device,
+            features=features
+        )
+
+
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    config_file = "local_runs/multi_modal/config.yaml"
-    model_path = 'local_runs/multi_modal/models/model_weights.pth'
+    config_file = "models/multi_modal/config.yaml"
+    model_path = 'models/multi_modal/model'
 
     candidates_path = 'datasets/local_parquet/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local_parquet/recall_validation_queries_dataset/queries.json'
@@ -365,7 +388,7 @@ if __name__ == '__main__':
     model = setup_model(conf)
     vectorizer = setup_vectorizer(conf)
 
-    model = prepare_model(model, model_path, from_checkpoint=False)
+    model = prepare_model(model, model_path, from_checkpoint=True)
     features = parse_features(conf)
 
     recall_validation(candidates_path,
@@ -376,7 +399,7 @@ if __name__ == '__main__':
                       similarity_metric=SimilarityMetric.COSINE,
                       model=model,
                       embedding_batch_size=4096,
-                      k=1024,
+                      ks=[10, 60, 100, 1024],
                       query_batch_size=128,
                       visualize_path="tensorboard/embeddings",
                       device=torch.device("cpu")

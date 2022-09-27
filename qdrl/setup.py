@@ -1,28 +1,14 @@
-import dataclasses
 from typing import List
 
 from omegaconf import DictConfig
 from torch import nn
 
 from qdrl.batch_softmax_cross_entropy_loss import BatchSoftmaxCrossEntropyLossComputer
+from qdrl.configs import Features, CategoricalFeature
 from qdrl.loss_computer import LossComputer
 from qdrl.models import SimpleTextEncoder, TwoTower, MultiModalTwoTower
 from qdrl.preprocess import TextVectorizer, DictionaryLoaderTextVectorizer, CategoricalFeatureMapper
 from qdrl.triplet_loss import BatchTripletLossComputer
-
-
-@dataclasses.dataclass
-class CategoricalFeature:
-    name: str
-    mapper: CategoricalFeatureMapper
-
-
-@dataclasses.dataclass
-class Features:
-    product_features: List[str]
-    query_features: List[str]
-    text_features: List[str]
-    categorical_features: List[CategoricalFeature]
 
 
 def parse_features(config: DictConfig) -> Features:

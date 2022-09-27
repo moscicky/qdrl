@@ -5,8 +5,8 @@ import pandas as pd
 import torch
 from torch.utils.data.dataset import T_co, IterableDataset
 
+from qdrl.configs import Features
 from qdrl.preprocess import TextVectorizer, clean_phrase
-from qdrl.setup import Features
 
 
 def _read_jsonl(path: str, cols: List[str]) -> pd.DataFrame:
