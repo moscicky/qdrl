@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import faiss
 import numpy as np
@@ -212,10 +212,11 @@ def write_embeddings(logdir_path: str, candidates: Dict[int, Dict], candidate_em
     tensorboard_writer.close()
 
 
-def calculate_recall(query_results: np.ndarray, queries: List[Dict],
-                     candidates_by_product_id: Dict[str, Dict]) -> float:
-    recalls = []
+def filter_invalid_queries(query_results: np.ndarray, queries: List[Dict], candidates_by_product_id: Dict[str, Dict]) -> \
+        List[Tuple[np.ndarray, List[int]]]:
     missing_counter = 0
+
+    query_results_with_relevant_items = []
 
     for idx, query_result in enumerate(query_results.tolist()):
         relevant_candidate_ids = queries[idx]["relevant_product_ids"]
@@ -226,16 +227,44 @@ def calculate_recall(query_results: np.ndarray, queries: List[Dict],
                 continue
             else:
                 relevant_aux_ids.append(candidates_by_product_id[relevant_candidate_id])
-        if relevant_aux_ids:
-            intersection = set(query_result).intersection(set(relevant_aux_ids))
-            num_found = len(intersection)
-            # if num_found == 0:
-            #     print(f"Not found any products: {queries[idx]['query_search_phrase']}")
-            recall = num_found / len(relevant_aux_ids)
-            recalls.append(recall)
-    print(f"Number of candidates not found during recall validation: {missing_counter}")
+            if relevant_aux_ids:
+                query_results_with_relevant_items.append(
+                    (query_result, relevant_aux_ids)
+                )
+
+    print(f"Number of queries ignored during recall validation (due to missing candidates) : {missing_counter}")
+    return query_results_with_relevant_items
+
+
+def calculate_recall(query_results_with_relevant_items: List[Tuple[np.ndarray, List[int]]], k: int) -> float:
+    recalls = []
+    for query_result, relevant_aux_ids in query_results_with_relevant_items:
+        qr_at_k = query_result[:k]
+        intersection = set(qr_at_k).intersection(set(relevant_aux_ids))
+        num_found = len(intersection)
+        # if num_found == 0:
+        #     print(f"Not found any products: {queries[idx]['query_search_phrase']}")
+        recall = num_found / len(relevant_aux_ids)
+        recalls.append(recall)
     recall = np.mean(np.array(recalls))
     return recall
+
+
+def calculate_mrr(query_results_with_relevant_items: List[Tuple[np.ndarray, List[int]]], k: int) -> float:
+    reciprocal_ranks = []
+    for query_result, relevant_aux_ids in query_results_with_relevant_items:
+        qr_at_k = query_result[:k]
+        found = False
+        relevant_items_aux_ids = set(relevant_aux_ids)
+        for item_rank, item_aux_id in enumerate(qr_at_k, 1):
+            if item_aux_id in relevant_items_aux_ids:
+                reciprocal_ranks.append(1 / item_rank)
+                found = True
+                break
+        if not found:
+            reciprocal_ranks.append(0.0)
+    mrr = np.mean(np.array(reciprocal_ranks))
+    return mrr
 
 
 def interactive_search(candidates_path: str,
@@ -283,7 +312,7 @@ def recall_validation(
         model: nn.Module,
         device: torch.device,
         visualize_path: Optional[str] = None
-) -> Dict[int, float]:
+) -> Dict[str, float]:
     index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
         candidates_path=candidates_path,
         features=features,
@@ -301,18 +330,23 @@ def recall_validation(
     print("Vectorized queries")
     query_embeddings = embed_queries(queries_parsed, model, batch_size=embedding_batch_size, device=device)
     print("Embedded queries")
-    recalls = {}
+    metrics = {}
+    query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k=max(ks))
+    print(f"Executed queries, will calculate validation metrics...")
+    query_results_with_relevant_items = filter_invalid_queries(query_results, queries, candidates_by_product_id)
     for k in ks:
-        query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
-        print("Executed queries")
-        recall = calculate_recall(query_results, queries, candidates_by_product_id)
-        recalls[k] = recall
+        recall = calculate_recall(query_results_with_relevant_items, k=k)
+        metrics[f"Recall@{k}"] = recall
         print(f"Average recall@{k}: {recall}")
+
+        mrr = calculate_mrr(query_results_with_relevant_items, k=k)
+        metrics[f"MRR@{k}"] = mrr
+        print(f"MRR@{k}: {mrr}")
     if visualize_path:
         write_embeddings(visualize_path, candidates, candidate_embeddings)
         print("Saved embedding visualization")
 
-    return recalls
+    return metrics
 
 
 class RecallValidator:
@@ -339,7 +373,7 @@ class RecallValidator:
         self.vectorizer = vectorizer
         self.features = features
 
-    def validate(self, model: nn.Module):
+    def validate(self, model: nn.Module) -> Dict[str, float]:
         return recall_validation(
             candidates_path=self.candidates_path,
             queries_path=self.queries_path,
