@@ -214,8 +214,8 @@ def write_embeddings(logdir_path: str, candidates: Dict[int, Dict], candidate_em
 
 def filter_invalid_queries(query_results: np.ndarray, queries: List[Dict], candidates_by_product_id: Dict[str, Dict]) -> \
         List[Tuple[np.ndarray, List[int]]]:
-    missing_counter = 0
-
+    missing_candidates = set()
+    invalid_queries = 0
     query_results_with_relevant_items = []
 
     for idx, query_result in enumerate(query_results.tolist()):
@@ -223,16 +223,18 @@ def filter_invalid_queries(query_results: np.ndarray, queries: List[Dict], candi
         relevant_aux_ids = []
         for relevant_candidate_id in relevant_candidate_ids:
             if relevant_candidate_id not in candidates_by_product_id:
-                missing_counter += 1
-                continue
+                missing_candidates.add(relevant_candidate_id)
             else:
                 relevant_aux_ids.append(candidates_by_product_id[relevant_candidate_id])
-            if relevant_aux_ids:
-                query_results_with_relevant_items.append(
-                    (query_result, relevant_aux_ids)
-                )
+        if relevant_aux_ids:
+            query_results_with_relevant_items.append(
+                (query_result, relevant_aux_ids)
+            )
+        else:
+            invalid_queries += 1
 
-    print(f"Number of queries ignored during recall validation (due to missing candidates) : {missing_counter}")
+    print(f"Number of candidates not found in recall validation : {len(missing_candidates)}")
+    print(f"Number of skipped queries in recall validation: {invalid_queries}")
     return query_results_with_relevant_items
 
 
