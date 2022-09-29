@@ -63,9 +63,9 @@ def train(
         if recall_validator:
             print("Starting recall validation")
             os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-            recalls = recall_validator.validate(model)
-            for k, recall in recalls.items():
-                tensorboard_writer.add_scalar(f"Recall@{k}/valid", recall, epoch)
+            metrics = recall_validator.validate(model)
+            for metric_name, metric_value in metrics.items():
+                tensorboard_writer.add_scalar(metric_name, metric_value, epoch)
 
 
 def init_directories(paths: List[str]):
