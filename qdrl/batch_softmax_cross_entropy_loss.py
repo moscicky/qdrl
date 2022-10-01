@@ -20,9 +20,10 @@ def batch_cosine(a: torch.tensor, b: torch.tensor, eps: float = 1e-8) -> torch.t
 
 
 class BatchSoftmaxCrossEntropyLossComputer(LossComputer):
-    def __init__(self, batch_size: int):
+    def __init__(self, batch_size: int, temperature: float):
         self.target = torch.tensor(np.eye(batch_size))
         self.loss = nn.CrossEntropyLoss(reduce=True, reduction="mean")
+        self.temperature = temperature
 
     def compute(self,
                 model: nn.Module,
@@ -33,5 +34,5 @@ class BatchSoftmaxCrossEntropyLossComputer(LossComputer):
         # [cos(a1,p1), cos(a1, p2) ... cos(a1, pn)]
         # ...
         # [cos(an,p1), cos(an, p2) ... cos(an, pn)]
-        similarity_matrix = batch_cosine(anchor_out, positive_out)
+        similarity_matrix = batch_cosine(anchor_out, positive_out) / self.temperature
         return self.loss(similarity_matrix, self.target.to(device))

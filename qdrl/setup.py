@@ -104,6 +104,7 @@ def setup_loss(config: DictConfig) -> LossComputer:
             loss_margin=config.loss.margin)
     elif config.loss.type == "batch_softmax":
         return BatchSoftmaxCrossEntropyLossComputer(
-            batch_size=config.loss.batch_size
+            batch_size=config.loss.batch_size,
+            temperature=config.loss.temperature
         )
     raise ValueError(f"Unknown loss type: {config.loss.type}")
