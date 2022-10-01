@@ -28,4 +28,9 @@ model:
     embedding_dim: 256
   fc_dim: 128
   output_dim: 128
-validate_recall: True
+recall_validation:
+  enabled: True
+  k:
+    - 10
+  query_typo_probabilities:
+    0.0
