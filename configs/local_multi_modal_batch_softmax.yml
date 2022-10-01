@@ -1,0 +1,55 @@
+task_id: "local_runs"
+run_id: "multi_modal"
+num_epochs: 5
+dataset_dir: "datasets/local_parquet"
+commit_hash: "whatever"
+batch_size: 64
+learning_rate: 1e-2
+reuse_epoch: True
+dataloader_workers: 4
+dataset:
+  query_features:
+    - name: "query_search_phrase"
+      type: "text"
+  product_features:
+    - name: "product_name"
+      type: "text"
+    - name: "product_category_id"
+      type: "categorical"
+      dictionary_path: "datasets/local_parquet/categories"
+      num_oov_categories: 23
+loss:
+  type: batch_softmax
+  batch_size: 64
+  temperature: 1.0
+negatives:
+  type: batch
+text_vectorizer:
+  type: dictionary
+  dictionary_path: datasets/local/token_dictionary_150k_0k_0k
+  word_unigrams_limit: 8
+  word_bigrams_limit: 0
+  char_trigrams_limit: 0
+  num_oov_tokens: 50000
+model:
+  type: MultiModalTwoTower
+  text_embedding:
+    num_embeddings: 200000
+    embedding_dim: 256
+  category_feature:
+    num_embeddings: 23000
+    embedding_dim: 32
+  fc_dim: 128
+  output_dim: 128
+  query:
+    text_feature: "query_search_phrase"
+  product:
+    text_feature: "product_name"
+    categorical_feature: "product_category_id"
+recall_validation:
+  enabled: False
+  k:
+    - 10
+    - 60
+    - 100
+    - 1024
