@@ -19,7 +19,7 @@ def predict(model: nn.Module,
         query_text = batch["query"][model.query_text_feature].to(device)
         product_text = batch["product"][model.product_text_feature].to(device)
         query = model.forward_query(query_text)
-        product = model(product_text)
+        product = model.forward_product(product_text)
     elif isinstance(model, MultiModalTwoTower):
         query_text = batch["query"][model.query_text_feature].to(device)
         product_text = batch["product"][model.product_text_feature].to(device)
