@@ -14,6 +14,7 @@ from qdrl.configs import SimilarityMetric, Features
 from qdrl.models import TwoTower, SimpleTextEncoder, MultiModalTwoTower
 from qdrl.preprocess import clean_phrase, TextVectorizer
 from qdrl.setup import setup_model, setup_vectorizer, parse_features
+from qdrl.typo_generator import TypoGenerator
 
 
 def prepare_model(
@@ -38,17 +39,11 @@ def load_candidates(candidates_path: str) -> Dict[int, Dict]:
     return candidates
 
 
-def vectorize_text(vectorizer: TextVectorizer, text: str) -> List[int]:
-    return vectorizer.vectorize(clean_phrase(text))
-
-
-def vectorize(texts: List[str],
-              vectorizer: TextVectorizer) -> np.ndarray:
-    vectorized = []
-    for text in texts:
-        vectorized.append(
-            np.array(vectorize_text(vectorizer, text), dtype=np.int32))
-    return np.array(vectorized)
+def vectorize_text(vectorizer: TextVectorizer, text: str, typo_generator: Optional[TypoGenerator]) -> List[int]:
+    text = clean_phrase(text)
+    if typo_generator:
+        text = typo_generator.create_typos(text)
+    return vectorizer.vectorize(text)
 
 
 def batch(iterable, n=1):
@@ -166,14 +161,15 @@ def parse_rows(
         rows: List[Dict],
         wanted_features: List[str],
         features: Features,
-        vectorizer: TextVectorizer) -> List[Dict]:
+        vectorizer: TextVectorizer,
+        typo_generator: Optional[TypoGenerator] = None) -> List[Dict]:
     parsed = []
     text_features = [f for f in wanted_features if f in features.text_features]
     categorical_features = [cf for cf in features.categorical_features if cf.name in wanted_features]
     for row in rows:
         c = {}
         for text_feature in text_features:
-            c[text_feature] = np.array(vectorize_text(vectorizer, (row[text_feature])), dtype="int")
+            c[text_feature] = np.array(vectorize_text(vectorizer, (row[text_feature]), typo_generator), dtype="int")
         for categorical_feature in categorical_features:
             c[categorical_feature.name] = np.array(categorical_feature.mapper.map(row[categorical_feature.name]),
                                                    dtype="int")
@@ -313,6 +309,7 @@ def recall_validation(
         ks: List[int],
         model: nn.Module,
         device: torch.device,
+        query_typo_probabilities: List[float],
         visualize_path: Optional[str] = None
 ) -> Dict[str, float]:
     index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
@@ -328,22 +325,25 @@ def recall_validation(
 
     queries = load_queries(queries_path)
     print("Loaded queries")
-    queries_parsed = parse_rows(queries, features.query_features, features, vectorizer)
-    print("Vectorized queries")
-    query_embeddings = embed_queries(queries_parsed, model, batch_size=embedding_batch_size, device=device)
-    print("Embedded queries")
     metrics = {}
-    query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k=max(ks))
-    print(f"Executed queries, will calculate validation metrics...")
-    query_results_with_relevant_items = filter_invalid_queries(query_results, queries, candidates_by_product_id)
-    for k in ks:
-        recall = calculate_recall(query_results_with_relevant_items, k=k)
-        metrics[f"Recall@{k}"] = recall
-        print(f"Average recall@{k}: {recall}")
+    for query_typo_probability in query_typo_probabilities:
+        tg = TypoGenerator(query_typo_probability)
+        metric_suffix = "" if query_typo_probability == 0.0 else f"/typos_prob={query_typo_probability}"
+        queries_parsed = parse_rows(queries, features.query_features, features, vectorizer, tg)
+        print("Vectorized queries")
+        query_embeddings = embed_queries(queries_parsed, model, batch_size=embedding_batch_size, device=device)
+        print("Embedded queries")
+        query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k=max(ks))
+        print(f"Executed queries, will calculate validation metrics...")
+        query_results_with_relevant_items = filter_invalid_queries(query_results, queries, candidates_by_product_id)
+        for k in ks:
+            recall = calculate_recall(query_results_with_relevant_items, k=k)
+            metrics[f"Recall@{k}{metric_suffix}"] = recall
+            print(f"Average recall@{k}{metric_suffix}: {recall}")
 
-        mrr = calculate_mrr(query_results_with_relevant_items, k=k)
-        metrics[f"MRR@{k}"] = mrr
-        print(f"MRR@{k}: {mrr}")
+            mrr = calculate_mrr(query_results_with_relevant_items, k=k)
+            metrics[f"MRR@{k}{metric_suffix}"] = mrr
+            print(f"MRR@{k}{metric_suffix}: {mrr}")
     if visualize_path:
         write_embeddings(visualize_path, candidates, candidate_embeddings)
         print("Saved embedding visualization")
@@ -362,7 +362,8 @@ class RecallValidator:
                  query_batch_size: int,
                  similarity_metric: SimilarityMetric,
                  k: List[int],
-                 device: torch.device
+                 query_typo_probabilities: List[float],
+                 device: torch.device,
                  ):
         self.candidates_path = candidates_path
         self.queries_path = queries_path
@@ -374,6 +375,7 @@ class RecallValidator:
         self.device = device
         self.vectorizer = vectorizer
         self.features = features
+        self.query_typo_probabilities = query_typo_probabilities
 
     def validate(self, model: nn.Module) -> Dict[str, float]:
         return recall_validation(
@@ -387,7 +389,8 @@ class RecallValidator:
             query_batch_size=self.query_batch_size,
             device=self.device,
             vectorizer=self.vectorizer,
-            features=self.features
+            features=self.features,
+            query_typo_probabilities=self.query_typo_probabilities
         )
 
 
@@ -407,17 +410,18 @@ def setup_recall_validator(config: DictConfig, vectorizer: TextVectorizer, devic
             k=config.recall_validation.k,
             query_batch_size=128,
             device=device,
-            features=features
+            features=features,
+            query_typo_probabilities=config.recall_validation.query_typo_probabilities
         )
 
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    config_file = "models/multi_modal/config.yaml"
-    model_path = 'models/multi_modal/model'
+    config_file = "models/typos/test/config.yaml"
+    model_path = 'models/typos/test/model'
 
-    candidates_path = 'datasets/local_parquet/recall_validation_items_dataset/items.json'
-    queries_path = 'datasets/local_parquet/recall_validation_queries_dataset/queries.json'
+    candidates_path = 'datasets/local/longest/recall_validation_items_dataset/items.json'
+    queries_path = 'datasets/local/longest/recall_validation_queries_dataset/queries.json'
 
     conf = OmegaConf.load(config_file)
 
@@ -438,7 +442,8 @@ if __name__ == '__main__':
                       ks=[10, 60, 100, 1024],
                       query_batch_size=128,
                       visualize_path="tensorboard/embeddings",
-                      device=torch.device("cpu")
+                      device=torch.device("cpu"),
+                      query_typo_probabilities=[0.0, 0.25, 0.5, 0.75, 1.0]
                       )
 
     # interactive_search(
