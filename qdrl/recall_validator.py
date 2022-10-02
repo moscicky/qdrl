@@ -14,7 +14,7 @@ from qdrl.configs import SimilarityMetric, Features
 from qdrl.models import TwoTower, SimpleTextEncoder, MultiModalTwoTower
 from qdrl.preprocess import clean_phrase, TextVectorizer
 from qdrl.setup import setup_model, setup_vectorizer, parse_features
-from qdrl.typo_generator import create_typos
+from qdrl.typo_generator import TypoGenerator
 
 
 def prepare_model(
@@ -39,10 +39,10 @@ def load_candidates(candidates_path: str) -> Dict[int, Dict]:
     return candidates
 
 
-def vectorize_text(vectorizer: TextVectorizer, text: str, typo_probability: Optional[float]) -> List[int]:
+def vectorize_text(vectorizer: TextVectorizer, text: str, typo_generator: Optional[TypoGenerator]) -> List[int]:
     text = clean_phrase(text)
-    if typo_probability:
-        text = create_typos(text, typo_probability)
+    if typo_generator:
+        text = typo_generator.create_typos(text)
     return vectorizer.vectorize(text)
 
 
@@ -162,14 +162,14 @@ def parse_rows(
         wanted_features: List[str],
         features: Features,
         vectorizer: TextVectorizer,
-        typo_probability: Optional[float] = None) -> List[Dict]:
+        typo_generator: Optional[TypoGenerator] = None) -> List[Dict]:
     parsed = []
     text_features = [f for f in wanted_features if f in features.text_features]
     categorical_features = [cf for cf in features.categorical_features if cf.name in wanted_features]
     for row in rows:
         c = {}
         for text_feature in text_features:
-            c[text_feature] = np.array(vectorize_text(vectorizer, (row[text_feature]), typo_probability), dtype="int")
+            c[text_feature] = np.array(vectorize_text(vectorizer, (row[text_feature]), typo_generator), dtype="int")
         for categorical_feature in categorical_features:
             c[categorical_feature.name] = np.array(categorical_feature.mapper.map(row[categorical_feature.name]),
                                                    dtype="int")
@@ -327,8 +327,9 @@ def recall_validation(
     print("Loaded queries")
     metrics = {}
     for query_typo_probability in query_typo_probabilities:
+        tg = TypoGenerator(query_typo_probability)
         metric_suffix = "" if query_typo_probability == 0.0 else f"/typos_prob={query_typo_probability}"
-        queries_parsed = parse_rows(queries, features.query_features, features, vectorizer, typo_probability=query_typo_probability)
+        queries_parsed = parse_rows(queries, features.query_features, features, vectorizer, tg)
         print("Vectorized queries")
         query_embeddings = embed_queries(queries_parsed, model, batch_size=embedding_batch_size, device=device)
         print("Embedded queries")
@@ -416,11 +417,11 @@ def setup_recall_validator(config: DictConfig, vectorizer: TextVectorizer, devic
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    config_file = "models/multi_modal/config.yaml"
-    model_path = 'models/multi_modal/model'
+    config_file = "models/typos/test/config.yaml"
+    model_path = 'models/typos/test/model'
 
-    candidates_path = 'datasets/local_parquet/recall_validation_items_dataset/items.json'
-    queries_path = 'datasets/local_parquet/recall_validation_queries_dataset/queries.json'
+    candidates_path = 'datasets/local/longest/recall_validation_items_dataset/items.json'
+    queries_path = 'datasets/local/longest/recall_validation_queries_dataset/queries.json'
 
     conf = OmegaConf.load(config_file)
 
@@ -442,7 +443,7 @@ if __name__ == '__main__':
                       query_batch_size=128,
                       visualize_path="tensorboard/embeddings",
                       device=torch.device("cpu"),
-                      query_typo_probabilities=[0.0, 0.33, 0.66]
+                      query_typo_probabilities=[0.0, 0.25, 0.5, 0.75, 1.0]
                       )
 
     # interactive_search(

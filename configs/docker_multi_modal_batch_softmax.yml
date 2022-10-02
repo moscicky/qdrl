@@ -50,3 +50,5 @@ recall_validation:
   enabled: True
   k:
     - 10
+  query_typo_probabilities:
+    - 0.25

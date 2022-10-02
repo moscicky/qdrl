@@ -69,37 +69,42 @@ ops = {
 }
 
 
-def create_typos(text: str, p: float, debug: bool = False, seed=42) -> str:
-    if p == 0.0:
-        return text
-    splitted = text.split(' ')
-    result = []
-    random.seed(seed)
-    for token in splitted:
-        if len(token) <= 3:
-            if debug:
-                print(f"{token} has length less than 3, skipping")
-            result.append(token)
-            continue
-        r = random.random()
-        if r > p:
-            if debug:
-                print(f"{token} will not be modified. Needed r>{p}, was r={r}")
-            result.append(token)
-            continue
-        typo_type = random.random()
-        for prob, op in ops.items():
-            if typo_type < prob:
-                if debug:
-                    print(f"Selected typo type {op} based on r={typo_type} for token={token}")
-                result.append(op(token))
-                break
+class TypoGenerator:
+    def __init__(self, p: float, seed: int = 42):
+        self.p = p
+        random.seed(seed)
 
-    res = ' '.join(result)
-    if debug:
-        print(f"Was '{text}', is '{res}'")
-    return res
+    def create_typos(self, text: str, debug: bool = False) -> str:
+        if self.p == 0.0:
+            return text
+        splitted = text.split(' ')
+        result = []
+        for token in splitted:
+            if len(token) <= 3:
+                if debug:
+                    print(f"{token} has length less than 3, skipping")
+                result.append(token)
+                continue
+            r = random.random()
+            if r > self.p:
+                if debug:
+                    print(f"{token} will not be modified. Needed r>{p}, was r={r}")
+                result.append(token)
+                continue
+            typo_type = random.random()
+            for prob, op in ops.items():
+                if typo_type < prob:
+                    if debug:
+                        print(f"Selected typo type {op} based on r={typo_type} for token={token}")
+                    result.append(op(token))
+                    break
+
+        res = ' '.join(result)
+        if debug:
+            print(f"Was '{text}', is '{res}'")
+        return res
 
 
 if __name__ == '__main__':
-    print(create_typos("How to remove an element from a list by index", p=0.3))
+    typo_generator = TypoGenerator(p=0.3)
+    print(typo_generator.create_typos("How to remove an element from a list by index"))
