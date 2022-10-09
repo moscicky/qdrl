@@ -1,4 +1,5 @@
-from typing import Dict, Any, List
+import argparse
+from typing import Dict, Any, List, Tuple
 
 from elasticsearch import Elasticsearch, helpers
 
@@ -34,7 +35,7 @@ def insert_candidates(candidates: List[Dict[str, Any]]):
     helpers.bulk(es, actions, refresh=True)
 
 
-def execute_queries(es: Elasticsearch, queries: List[Dict[str, Any]], k: int):
+def execute_queries(es: Elasticsearch, queries: List[Dict[str, Any]], k: int) -> List[Tuple[List[str], List[str]]]:
     results = []
     batch_size = 100
     l = len(queries)
@@ -52,13 +53,39 @@ def execute_queries(es: Elasticsearch, queries: List[Dict[str, Any]], k: int):
                 "_source": ["_id"],
             }
             request.extend([req_head, req_body])
-        res = es.msearch(body=request)
+        res = es.msearch(searches=request)
         tmp = [[h['_id'] for h in r['hits']['hits']] for r in res.body['responses']]
         results.extend(tmp)
     ret = []
     for q, r in zip(queries, results):
         ret.append((r, q["relevant_product_ids"]))
     return ret
+
+
+def filter_invalid_queries(queries: List[Dict], candidates: List[Dict]) -> List[Dict]:
+    missing_candidates = set()
+    invalid_queries = 0
+    candidate_ids = set([c["product_id"] for c in candidates])
+
+    filtered_queries = []
+
+    for idx, query in enumerate(queries):
+        relevant_candidate_ids = query["relevant_product_ids"]
+        good_candidates = []
+        for relevant_candidate_id in relevant_candidate_ids:
+            if relevant_candidate_id not in candidate_ids:
+                missing_candidates.add(relevant_candidate_id)
+            else:
+                good_candidates.append(relevant_candidate_id)
+        if good_candidates:
+            fixed_query = {**query, **{"relevant_product_ids": good_candidates}}
+            filtered_queries.append(fixed_query)
+        else:
+            invalid_queries += 1
+
+    print(f"Number of candidates not found in recall validation : {len(missing_candidates)}")
+    print(f"Number of skipped queries in recall validation: {invalid_queries}")
+    return filtered_queries
 
 
 def search(
@@ -76,26 +103,12 @@ def search(
 
     if load:
         insert_candidates(candidates)
+
     queries = load_queries(queries_path)
     queries = clean_queries(queries)
-
-    query_results_with_relevant_items = []
-
-    execute_queries(es, queries, max(ks))
-
-    # checkpoints = [len(queries) // 10 * i for i in range(0, 10)]
-    # for idx, query in enumerate(queries):
-    #     if idx in checkpoints:
-    #         print(f"finished searching for {(idx / len(queries)) * 100} % queries")
-    #     resp = es.search(index=es_index, query={"match": {"product_name": query["query_search_phrase"]}},
-    #                      source=["_id"], size=max(ks))
-    #     found_ids = [h["_id"] for h in resp.body['hits']['hits']]
-    #     query_results_with_relevant_items.append((found_ids, query["relevant_product_ids"]))
+    queries = filter_invalid_queries(queries, candidates)
     query_results_with_relevant_items = execute_queries(es, queries, k=max(ks))
     print("executed queries")
-
-    # TODO: filter out invalid queries
-
     for k in ks:
         recall = calculate_recall(query_results_with_relevant_items, k=k)
         print(f"Average recall@{k}: {recall}")
@@ -105,8 +118,41 @@ def search(
 
 
 if __name__ == '__main__':
-    es = Elasticsearch("https://localhost:9200",
-                        timeout=10000)
+    args_parser = argparse.ArgumentParser()
+
+    args_parser.add_argument(
+        '--cert-file-path',
+        type=str,
+        default=None,
+        required=True
+    )
+
+    args_parser.add_argument(
+        '--elastic-url',
+        type=str,
+        default="https://localhost:9200",
+        required=False
+    )
+
+    args_parser.add_argument(
+        '--elastic-user',
+        type=str,
+        default="elastic",
+        required=False
+    )
+
+    args_parser.add_argument(
+        '--elastic-password',
+        type=str,
+        default=None,
+        required=True
+    )
+
+    options = args_parser.parse_args()
+
+    es = Elasticsearch(options.elastic_url,
+                       ca_certs=options.cert_file_path,
+                       basic_auth=(options.elastic_user, options.elastic_password), request_timeout=10000)
 
     candidates_path = 'datasets/local/longest/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local/longest/recall_validation_queries_dataset/queries.json'
