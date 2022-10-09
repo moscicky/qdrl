@@ -6,7 +6,7 @@ RUN_ID="$(date +'%Y-%m-%d-%H-%M')"
 
 DISPLAY_NAME="${NAME}_${RUN_ID}"
 EXTRA_DIRS="datasets/docker,datasets/docker_parquet,configs"
-CONFIG="docker_multi_modal_batch_softmax.yml"
+CONFIG="hidden_layers/docker.yml"
 
 # build image which will be pushed to gcr
 if [[ -z "${PROJECT}" ]]; then

@@ -39,8 +39,11 @@ model:
   category_feature:
     num_embeddings: 23000
     embedding_dim: 32
-  hidden_layers: []
-  output_dim: 256
+  hidden_layers:
+    - 256
+    - 128
+  last_linear: False
+  output_dim: 128
   query:
     text_feature: "query_search_phrase"
   product:
