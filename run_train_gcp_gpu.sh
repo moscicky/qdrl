@@ -22,8 +22,6 @@ if [[ -z "${CONFIG_URL}" ]]; then
 else
 fi
 
-gsu
-
 echo "staring training job with args"
 echo "CONTAINER_IMAGE_URI: $CONTAINER_IMAGE_URI"
 echo "DISPLAY_NAME: $DISPLAY_NAME"
