@@ -1,3 +1,5 @@
+from typing import List
+
 import torch
 from torch import nn
 
@@ -106,7 +108,8 @@ class MultiModalTwoTower(nn.Module):
                  text_embedding_dim: int,
                  category_embedding_dim: int,
                  category_num_embeddings: int,
-                 fc_dim: int,
+                 hidden_layers: List[int],
+                 last_linear: bool,
                  output_dim: int,
                  query_text_feature: str,
                  product_text_feature: str,
@@ -126,9 +129,7 @@ class MultiModalTwoTower(nn.Module):
 
         self.query_tower = nn.Sequential(
             self.text_embedding,
-            nn.Linear(in_features=text_embedding_dim, out_features=fc_dim),
-            nn.ReLU(),
-            nn.Linear(in_features=fc_dim, out_features=output_dim)
+            self._mlp(input_dim=text_embedding_dim, hidden_layers=hidden_layers, output_dim=output_dim, last_linear=last_linear)
         )
 
         self.category_embedding = nn.Embedding(
@@ -136,11 +137,28 @@ class MultiModalTwoTower(nn.Module):
             embedding_dim=category_embedding_dim
         )
 
-        self.product_fc = nn.Sequential(
-            nn.Linear(in_features=text_embedding_dim + category_embedding_dim, out_features=fc_dim),
-            nn.ReLU(),
-            nn.Linear(in_features=fc_dim, out_features=output_dim)
-        )
+        self.product_mlp = self._mlp(input_dim=text_embedding_dim + category_embedding_dim,
+                                     hidden_layers=hidden_layers,
+                                     output_dim=output_dim, last_linear=last_linear)
+
+    def _mlp(self, input_dim: int, output_dim: int, hidden_layers: List[int], last_linear: bool) -> nn.Module:
+        mlp = nn.Sequential()
+        layers = [input_dim] + hidden_layers + [output_dim]
+        for i in range(1, len(layers)):
+            if i == len(layers) - 1:
+                if last_linear:
+                    mlp.append(
+                        nn.Linear(in_features=layers[i - 1], out_features=layers[i])
+                    )
+            else:
+                mlp.append(
+                    nn.Linear(in_features=layers[i - 1], out_features=layers[i])
+                )
+                if len(hidden_layers) > 0:
+                    mlp.append(
+                        nn.ReLU()
+                    )
+        return mlp
 
     def forward_query(self, text: torch.Tensor) -> torch.Tensor:
         return self.query_tower(text)
@@ -151,4 +169,4 @@ class MultiModalTwoTower(nn.Module):
 
         combined = torch.cat((t, c), 1)
 
-        return self.product_fc(combined)
+        return self.product_mlp(combined)
