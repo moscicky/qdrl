@@ -85,11 +85,12 @@ def setup_model(config: DictConfig) -> nn.Module:
             text_embedding_dim=c.text_embedding.embedding_dim,
             category_embedding_dim=c.category_feature.embedding_dim,
             category_num_embeddings=c.category_feature.num_embeddings,
-            fc_dim=c.fc_dim,
+            hidden_layers=c.hidden_layers,
             output_dim=c.output_dim,
             query_text_feature=c.query.text_feature,
             product_text_feature=c.product.text_feature,
-            product_categorical_feature=c.product.categorical_feature
+            product_categorical_feature=c.product.categorical_feature,
+            last_linear=c.last_linear
         )
         return model
     else:

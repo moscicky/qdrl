@@ -6,7 +6,7 @@ REPLICA_COUNT=1
 GPU_CARD="NVIDIA_TESLA_T4"
 GPU_COUNT=1
 
-NAME="typo_validation_150k_0k"
+NAME="text_256_cat_32_hidden_256_linear_256.yml.yml"
 
 DISPLAY_NAME="${NAME}_$(date +'%Y_%m_%dT%H_%M')"
 
@@ -21,8 +21,6 @@ if [[ -z "${CONFIG_URL}" ]]; then
   exit(0)
 else
 fi
-
-gsu
 
 echo "staring training job with args"
 echo "CONTAINER_IMAGE_URI: $CONTAINER_IMAGE_URI"

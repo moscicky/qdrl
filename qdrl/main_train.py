@@ -132,6 +132,8 @@ def main(
 
     model = setup_model(config)
 
+    print("Will train using model", model)
+
     optimizer = optim.Adam(model.parameters(), lr=conf.learning_rate)
 
     epoch_start = 0
