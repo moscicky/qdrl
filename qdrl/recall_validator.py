@@ -417,8 +417,8 @@ def setup_recall_validator(config: DictConfig, vectorizer: TextVectorizer, devic
 
 if __name__ == '__main__':
     os.environ['KMP_DUPLICATE_LIB_OK'] = 'True'
-    config_file = "models/typos/test/config.yaml"
-    model_path = 'models/typos/test/model'
+    config_file = "models/loss_function/config.yaml"
+    model_path = 'models/loss_function/models/model_weights.pth'
 
     candidates_path = 'datasets/local/longest/recall_validation_items_dataset/items.json'
     queries_path = 'datasets/local/longest/recall_validation_queries_dataset/queries.json'
@@ -428,7 +428,7 @@ if __name__ == '__main__':
     model = setup_model(conf)
     vectorizer = setup_vectorizer(conf)
 
-    model = prepare_model(model, model_path, from_checkpoint=True)
+    model = prepare_model(model, model_path, from_checkpoint=False)
     features = parse_features(conf)
 
     recall_validation(candidates_path,
@@ -439,11 +439,11 @@ if __name__ == '__main__':
                       similarity_metric=SimilarityMetric.COSINE,
                       model=model,
                       embedding_batch_size=4096,
-                      ks=[10, 60, 100, 1024],
+                      ks=[10, 50, 100, 500, 1000],
                       query_batch_size=128,
                       visualize_path="tensorboard/embeddings",
                       device=torch.device("cpu"),
-                      query_typo_probabilities=[0.0, 0.25, 0.5, 0.75, 1.0]
+                      query_typo_probabilities=[0.0]
                       )
 
     # interactive_search(
