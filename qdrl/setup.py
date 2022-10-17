@@ -74,9 +74,11 @@ def setup_model(config: DictConfig) -> nn.Module:
         model = TwoTower(
             num_embeddings=c.text_embedding.num_embeddings,
             text_embedding_dim=c.text_embedding.embedding_dim,
+            hidden_layers=c.hidden_layers,
             output_dim=c.output_dim,
             query_text_feature=c.query.text_feature,
-            product_text_feature=c.product.text_feature
+            product_text_feature=c.product.text_feature,
+            last_linear=c.last_linear
         )
         return model
     elif c.type == "MultiModalTwoTower":

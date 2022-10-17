@@ -67,6 +67,8 @@ class TwoTower(nn.Module):
                  num_embeddings: int,
                  text_embedding_dim: int,
                  output_dim: int,
+                 hidden_layers: List[int],
+                 last_linear: bool,
                  query_text_feature: str,
                  product_text_feature: str):
         super(TwoTower, self).__init__()
@@ -80,16 +82,14 @@ class TwoTower(nn.Module):
 
         self.query_tower = nn.Sequential(
             self.text_embedding,
-            nn.Linear(in_features=text_embedding_dim, out_features=output_dim),
-            nn.ReLU(),
-            nn.Linear(in_features=output_dim, out_features=output_dim)
+            _mlp(input_dim=text_embedding_dim, output_dim=output_dim, hidden_layers=hidden_layers,
+                 last_linear=last_linear)
         )
 
         self.product_tower = nn.Sequential(
             self.text_embedding,
-            nn.Linear(in_features=text_embedding_dim, out_features=output_dim),
-            nn.ReLU(),
-            nn.Linear(in_features=output_dim, out_features=output_dim)
+            _mlp(input_dim=text_embedding_dim, output_dim=output_dim, hidden_layers=hidden_layers,
+                 last_linear=last_linear)
         )
 
         self.query_text_feature = query_text_feature
@@ -100,6 +100,26 @@ class TwoTower(nn.Module):
 
     def forward_product(self, text: torch.Tensor) -> torch.Tensor:
         return self.product_tower(text)
+
+
+def _mlp(input_dim: int, output_dim: int, hidden_layers: List[int], last_linear: bool) -> nn.Module:
+    mlp = nn.Sequential()
+    layers = [input_dim] + hidden_layers + [output_dim]
+    for i in range(1, len(layers)):
+        if i == len(layers) - 1:
+            if last_linear:
+                mlp.append(
+                    nn.Linear(in_features=layers[i - 1], out_features=layers[i])
+                )
+        else:
+            mlp.append(
+                nn.Linear(in_features=layers[i - 1], out_features=layers[i])
+            )
+            if len(hidden_layers) > 0:
+                mlp.append(
+                    nn.ReLU()
+                )
+    return mlp
 
 
 class MultiModalTwoTower(nn.Module):
@@ -129,7 +149,8 @@ class MultiModalTwoTower(nn.Module):
 
         self.query_tower = nn.Sequential(
             self.text_embedding,
-            self._mlp(input_dim=text_embedding_dim, hidden_layers=hidden_layers, output_dim=output_dim, last_linear=last_linear)
+            _mlp(input_dim=text_embedding_dim, hidden_layers=hidden_layers, output_dim=output_dim,
+                 last_linear=last_linear)
         )
 
         self.category_embedding = nn.Embedding(
@@ -137,28 +158,9 @@ class MultiModalTwoTower(nn.Module):
             embedding_dim=category_embedding_dim
         )
 
-        self.product_mlp = self._mlp(input_dim=text_embedding_dim + category_embedding_dim,
-                                     hidden_layers=hidden_layers,
-                                     output_dim=output_dim, last_linear=last_linear)
-
-    def _mlp(self, input_dim: int, output_dim: int, hidden_layers: List[int], last_linear: bool) -> nn.Module:
-        mlp = nn.Sequential()
-        layers = [input_dim] + hidden_layers + [output_dim]
-        for i in range(1, len(layers)):
-            if i == len(layers) - 1:
-                if last_linear:
-                    mlp.append(
-                        nn.Linear(in_features=layers[i - 1], out_features=layers[i])
-                    )
-            else:
-                mlp.append(
-                    nn.Linear(in_features=layers[i - 1], out_features=layers[i])
-                )
-                if len(hidden_layers) > 0:
-                    mlp.append(
-                        nn.ReLU()
-                    )
-        return mlp
+        self.product_mlp = _mlp(input_dim=text_embedding_dim + category_embedding_dim,
+                                hidden_layers=hidden_layers,
+                                output_dim=output_dim, last_linear=last_linear)
 
     def forward_query(self, text: torch.Tensor) -> torch.Tensor:
         return self.query_tower(text)
