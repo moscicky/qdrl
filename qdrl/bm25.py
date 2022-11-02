@@ -162,6 +162,6 @@ if __name__ == '__main__':
         queries_path=queries_path,
         es=es,
         cleanup=False,
-        load=False,
-        ks=[10, 60, 100, 1024]
+        load=True,
+        ks=[10, 50, 100]
     )
