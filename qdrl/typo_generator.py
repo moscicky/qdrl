@@ -80,9 +80,9 @@ class TypoGenerator:
         splitted = text.split(' ')
         result = []
         for token in splitted:
-            if len(token) <= 3:
+            if len(token) < 2:
                 if debug:
-                    print(f"{token} has length less than 3, skipping")
+                    print(f"{token} has length less than 2, skipping")
                 result.append(token)
                 continue
             r = random.random()
