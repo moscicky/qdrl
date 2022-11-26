@@ -1,7 +1,5 @@
 .idea
 
-.mypy_cache
-
 test-reports
 
 datasets

@@ -1,10 +1,7 @@
 torch==1.11.0
 numpy==1.21.2
 pandas==1.0.5
-flake8
 pytest==6.2.4
-tox==3.24.5
-mypy==0.931
 faiss-cpu==1.7.2
 tensorboard==2.9.0
 protobuf==3.20.1

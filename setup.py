@@ -13,10 +13,7 @@ install_requirements = [
 ]
 
 test_requirements = [
-    "flake8",
     "pytest==6.2.4",
-    "tox==3.24.5",
-    "mypy==0.931"
 ]
 
 setup(
