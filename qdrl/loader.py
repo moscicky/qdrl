@@ -83,14 +83,6 @@ class LazyTextDataset(IterableDataset):
             }
 
 
-# class ItemsDataset:
-#     def __init__(self, path: str, cols: List[str], vectorizer: TextVectorizer):
-#         self.df = _prepare_dataset(path, cols, 'csv', vectorizer)
-#
-#     def take(self, n: int) -> pd.DataFrame:
-#         return self.df.sample(n=n)
-
-
 class ChunkingDataset(IterableDataset):
     def __init__(self,
                  dataset_dir_path: str,
