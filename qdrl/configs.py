@@ -17,7 +17,7 @@ class CategoricalFeature:
 
 @dataclasses.dataclass
 class Features:
-    product_features: List[str]
+    document_features: List[str]
     query_features: List[str]
     text_features: List[str]
     categorical_features: List[CategoricalFeature]

@@ -8,7 +8,7 @@ from qdrl.recall_validator import load_candidates, load_queries, calculate_recal
 
 
 def clean_candidates(candidates: List[Dict[str, Any]]):
-    return [{**c, "product_name": clean_phrase(c["product_name"])} for c in candidates]
+    return [{**c, "document_name": clean_phrase(c["document_name"])} for c in candidates]
 
 
 def clean_queries(queries: List[Dict[str, Any]]):
@@ -24,10 +24,10 @@ def insert_candidates(candidates: List[Dict[str, Any]]):
         action = {
             "_index": es_index,
             "doc_type": "candidate",
-            "_id": candidate["product_id"],
+            "_id": candidate["document_id"],
             "_source": {
-                "id": candidate["product_id"],
-                "product_name": candidate["product_name"],
+                "id": candidate["document_id"],
+                "document_name": candidate["document_name"],
             }
         }
         actions.append(action)
@@ -47,7 +47,7 @@ def execute_queries(es: Elasticsearch, queries: List[Dict[str, Any]], k: int) ->
             req_head = {'index': es_index}
             req_body = {
                 "query": {
-                    "match": {"product_name": query["query_search_phrase"]}
+                    "match": {"document_name": query["query_search_phrase"]}
                 },
                 "size": k,
                 "_source": ["_id"],
@@ -58,19 +58,19 @@ def execute_queries(es: Elasticsearch, queries: List[Dict[str, Any]], k: int) ->
         results.extend(tmp)
     ret = []
     for q, r in zip(queries, results):
-        ret.append((r, q["relevant_product_ids"]))
+        ret.append((r, q["relevant_document_ids"]))
     return ret
 
 
 def filter_invalid_queries(queries: List[Dict], candidates: List[Dict]) -> List[Dict]:
     missing_candidates = set()
     invalid_queries = 0
-    candidate_ids = set([c["product_id"] for c in candidates])
+    candidate_ids = set([c["document_id"] for c in candidates])
 
     filtered_queries = []
 
     for idx, query in enumerate(queries):
-        relevant_candidate_ids = query["relevant_product_ids"]
+        relevant_candidate_ids = query["relevant_document_ids"]
         good_candidates = []
         for relevant_candidate_id in relevant_candidate_ids:
             if relevant_candidate_id not in candidate_ids:
@@ -78,7 +78,7 @@ def filter_invalid_queries(queries: List[Dict], candidates: List[Dict]) -> List[
             else:
                 good_candidates.append(relevant_candidate_id)
         if good_candidates:
-            fixed_query = {**query, **{"relevant_product_ids": good_candidates}}
+            fixed_query = {**query, **{"relevant_document_ids": good_candidates}}
             filtered_queries.append(fixed_query)
         else:
             invalid_queries += 1

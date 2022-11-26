@@ -52,7 +52,7 @@ def _prepare_dataset(path: str,
     else:
         raise ValueError(f"Unknown type: {type}")
     print(f"Reading dataset: {path}")
-    all_features = features.product_features + features.query_features
+    all_features = features.document_features + features.query_features
     df = reader(path, all_features).astype('str')
     df[features.text_features] = df[features.text_features].applymap(lambda c: clean_phrase(c))
     df[features.text_features] = df[features.text_features].applymap(lambda c: vectorizer.vectorize(c))
@@ -79,7 +79,7 @@ class LazyTextDataset(IterableDataset):
         for row in ds.iterrows():
             yield {
                 "query": {f: torch.tensor(row[1][f]) for f in self.features.query_features},
-                "product": {f: torch.tensor(row[1][f]) for f in self.features.product_features}
+                "document": {f: torch.tensor(row[1][f]) for f in self.features.document_features}
             }
 
 

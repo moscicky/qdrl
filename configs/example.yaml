@@ -11,8 +11,8 @@ dataset:
   query_features:
     - name: "query_search_phrase"
       type: "text"
-  product_features:
-    - name: "product_name"
+  document_features:
+    - name: "document_name"
       type: "text"
 loss:
   type: batch_softmax
@@ -38,8 +38,8 @@ model:
   output_dim: 128
   query:
     text_feature: "query_search_phrase"
-  product:
-    text_feature: "product_name"
+  document:
+    text_feature: "document_name"
 recall_validation:
   enabled: False
   k:

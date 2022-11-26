@@ -12,20 +12,20 @@ def predict(model: nn.Module,
             ) -> [torch.tensor, torch.tensor]:
     if isinstance(model, SimpleTextEncoder):
         query_text = batch["query"][model.query_text_feature].to(device)
-        product_text = batch["product"][model.product_text_feature].to(device)
+        document_text = batch["document"][model.document_text_feature].to(device)
         query = model(query_text)
-        product = model(product_text)
+        document = model(document_text)
     elif isinstance(model, TwoTower):
         query_text = batch["query"][model.query_text_feature].to(device)
-        product_text = batch["product"][model.product_text_feature].to(device)
+        document_text = batch["document"][model.document_text_feature].to(device)
         query = model.forward_query(query_text)
-        product = model.forward_product(product_text)
+        document = model.forward_document(document_text)
     elif isinstance(model, MultiModalTwoTower):
         query_text = batch["query"][model.query_text_feature].to(device)
-        product_text = batch["product"][model.product_text_feature].to(device)
-        product_categorical_feature = batch["product"][model.product_categorical_feature].to(device)
+        document_text = batch["document"][model.document_text_feature].to(device)
+        document_categorical_feature = batch["document"][model.document_categorical_feature].to(device)
         query = model.forward_query(query_text)
-        product = model.forward_product(text=product_text, category=product_categorical_feature)
+        document = model.forward_document(text=document_text, category=document_categorical_feature)
     else:
         raise ValueError("Unknown model type!")
-    return query, product
+    return query, document

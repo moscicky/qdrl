@@ -13,7 +13,7 @@ from qdrl.triplet_loss import BatchTripletLossComputer
 
 def parse_features(config: DictConfig) -> Features:
     query_features = []
-    product_features = []
+    document_features = []
     text_features = []
     categorical_features = []
 
@@ -34,10 +34,10 @@ def parse_features(config: DictConfig) -> Features:
                 raise ValueError(f"Unknown feature type: {feature.type}")
 
     parse(config.dataset.query_features, query_features, text_features, categorical_features)
-    parse(config.dataset.product_features, product_features, text_features, categorical_features)
+    parse(config.dataset.document_features, document_features, text_features, categorical_features)
 
     return Features(
-        product_features=product_features,
+        document_features=document_features,
         query_features=query_features,
         text_features=text_features,
         categorical_features=categorical_features,
@@ -67,7 +67,7 @@ def setup_model(config: DictConfig) -> nn.Module:
             fc_dim=c.fc_dim,
             output_dim=c.output_dim,
             query_text_feature=c.query.text_feature,
-            product_text_feature=c.product.text_feature
+            document_text_feature=c.document.text_feature
         )
         return model
     elif c.type == "TwoTower":
@@ -77,7 +77,7 @@ def setup_model(config: DictConfig) -> nn.Module:
             hidden_layers=c.hidden_layers,
             output_dim=c.output_dim,
             query_text_feature=c.query.text_feature,
-            product_text_feature=c.product.text_feature,
+            document_text_feature=c.document.text_feature,
             last_linear=c.last_linear
         )
         return model
@@ -90,8 +90,8 @@ def setup_model(config: DictConfig) -> nn.Module:
             hidden_layers=c.hidden_layers,
             output_dim=c.output_dim,
             query_text_feature=c.query.text_feature,
-            product_text_feature=c.product.text_feature,
-            product_categorical_feature=c.product.categorical_feature,
+            document_text_feature=c.document.text_feature,
+            document_categorical_feature=c.document.categorical_feature,
             last_linear=c.last_linear
         )
         return model

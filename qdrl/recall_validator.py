@@ -68,12 +68,12 @@ def embed_candidates(
             print(f"Embedded {(batch_idx / batches) * 100} % candidate batches")
         collated = default_collate(b)
         if isinstance(model, SimpleTextEncoder):
-            embedded = model.forward(collated[model.product_text_feature].to(device))
+            embedded = model.forward(collated[model.document_text_feature].to(device))
         elif isinstance(model, TwoTower):
-            embedded = model.forward_product(collated[model.product_text_feature].to(device))
+            embedded = model.forward_document(collated[model.document_text_feature].to(device))
         elif isinstance(model, MultiModalTwoTower):
-            embedded = model.forward_product(text=collated[model.product_text_feature].to(device),
-                                             category=collated[model.product_categorical_feature].to(device))
+            embedded = model.forward_document(text=collated[model.document_text_feature].to(device),
+                                             category=collated[model.document_categorical_feature].to(device))
         else:
             raise ValueError("Model type not supported")
         batch_idx += 1
@@ -114,7 +114,7 @@ def create_index(
         embeddings: np.ndarray,
         similarity_metric: SimilarityMetric):
     print("Trying to create index")
-    index = faiss.IndexFlat(dim, faiss.METRIC_INNER_PRODUCT)
+    index = faiss.IndexFlat(dim, faiss.METRIC_INNER_document)
     if similarity_metric == SimilarityMetric.COSINE:
         faiss.normalize_L2(embeddings)
     index.add(embeddings)
@@ -186,42 +186,42 @@ def candidates_index(candidates_path: str,
                      model: nn.Module,
                      device: torch.device):
     candidates = load_candidates(candidates_path)
-    candidates_by_product_id = {v["product_id"]: k for k, v in candidates.items()}
+    candidates_by_document_id = {v["document_id"]: k for k, v in candidates.items()}
     print("Loaded candidates")
-    candidates_parsed = parse_rows(candidates.values(), features.product_features, features, vectorizer)
+    candidates_parsed = parse_rows(candidates.values(), features.document_features, features, vectorizer)
     print("Vectorized candidates")
     candidate_embeddings = embed_candidates(candidates_parsed, model, embedding_batch_size, device)
     print("Embedded candidates")
     index = create_index(embedding_dim, candidate_embeddings, similarity_metric)
     print("Created candidates index")
-    return index, candidates_by_product_id, candidates, candidate_embeddings
+    return index, candidates_by_document_id, candidates, candidate_embeddings
 
 
 def write_embeddings(logdir_path: str, candidates: Dict[int, Dict], candidate_embeddings: np.ndarray):
     indices = np.random.randint(low=0, high=len(candidates), size=10000)
     tensorboard_writer = SummaryWriter(log_dir=logdir_path)
-    product_names = [v["product_name"] for k, v in candidates.items()]
-    meta = np.array(product_names)[indices]
+    document_names = [v["document_name"] for k, v in candidates.items()]
+    meta = np.array(document_names)[indices]
     tensorboard_writer.add_embedding(
         mat=candidate_embeddings[indices, :], metadata=meta
     )
     tensorboard_writer.close()
 
 
-def filter_invalid_queries(query_results: np.ndarray, queries: List[Dict], candidates_by_product_id: Dict[str, Dict]) -> \
+def filter_invalid_queries(query_results: np.ndarray, queries: List[Dict], candidates_by_document_id: Dict[str, Dict]) -> \
         List[Tuple[np.ndarray, List[int]]]:
     missing_candidates = set()
     invalid_queries = 0
     query_results_with_relevant_items = []
 
     for idx, query_result in enumerate(query_results.tolist()):
-        relevant_candidate_ids = queries[idx]["relevant_product_ids"]
+        relevant_candidate_ids = queries[idx]["relevant_document_ids"]
         relevant_aux_ids = []
         for relevant_candidate_id in relevant_candidate_ids:
-            if relevant_candidate_id not in candidates_by_product_id:
+            if relevant_candidate_id not in candidates_by_document_id:
                 missing_candidates.add(relevant_candidate_id)
             else:
-                relevant_aux_ids.append(candidates_by_product_id[relevant_candidate_id])
+                relevant_aux_ids.append(candidates_by_document_id[relevant_candidate_id])
         if relevant_aux_ids:
             query_results_with_relevant_items.append(
                 (query_result, relevant_aux_ids)
@@ -240,8 +240,6 @@ def calculate_recall(query_results_with_relevant_items: List[Tuple[np.ndarray, L
         qr_at_k = query_result[:k]
         intersection = set(qr_at_k).intersection(set(relevant_aux_ids))
         num_found = len(intersection)
-        # if num_found == 0:
-        #     print(f"Not found any products: {queries[idx]['query_search_phrase']}")
         recall = num_found / len(relevant_aux_ids)
         recalls.append(recall)
     recall = np.mean(np.array(recalls))
@@ -275,7 +273,7 @@ def interactive_search(candidates_path: str,
                        k: int,
                        model: nn.Module,
                        device: torch.device):
-    index, candidates_by_product_id, candidates, _ = candidates_index(
+    index, candidates_by_document_id, candidates, _ = candidates_index(
         candidates_path=candidates_path,
         features=features,
         vectorizer=vectorizer,
@@ -294,7 +292,7 @@ def interactive_search(candidates_path: str,
         query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k)
         for query_result in query_results.tolist():
             for result_idx, result in enumerate(query_result):
-                print(f"{result_idx}: {candidates[result]['product_name']}")
+                print(f"{result_idx}: {candidates[result]['document_name']}")
 
 
 def recall_validation(
@@ -312,7 +310,7 @@ def recall_validation(
         query_typo_probabilities: List[float],
         visualize_path: Optional[str] = None
 ) -> Dict[str, float]:
-    index, candidates_by_product_id, candidates, candidate_embeddings = candidates_index(
+    index, candidates_by_document_id, candidates, candidate_embeddings = candidates_index(
         candidates_path=candidates_path,
         features=features,
         vectorizer=vectorizer,
@@ -335,7 +333,7 @@ def recall_validation(
         print("Embedded queries")
         query_results = search(query_embeddings, query_batch_size, similarity_metric, index, k=max(ks))
         print(f"Executed queries, will calculate validation metrics...")
-        query_results_with_relevant_items = filter_invalid_queries(query_results, queries, candidates_by_product_id)
+        query_results_with_relevant_items = filter_invalid_queries(query_results, queries, candidates_by_document_id)
         for k in ks:
             recall = calculate_recall(query_results_with_relevant_items, k=k)
             metrics[f"Recall@{k}{metric_suffix}"] = recall

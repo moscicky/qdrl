@@ -25,7 +25,7 @@ class SimpleTextEncoder(nn.Module):
                  fc_dim: int,
                  output_dim: int,
                  query_text_feature: str,
-                 product_text_feature: str
+                 document_text_feature: str
                  ):
         super(SimpleTextEncoder, self).__init__()
         self.net = nn.Sequential(
@@ -38,7 +38,7 @@ class SimpleTextEncoder(nn.Module):
             nn.Linear(in_features=fc_dim, out_features=output_dim)
         )
         self.query_text_feature = query_text_feature
-        self.product_text_feature = product_text_feature
+        self.document_text_feature = document_text_feature
 
     def forward(self, vectorized_text: torch.Tensor) -> torch.Tensor:
         return self.net(vectorized_text)
@@ -70,7 +70,7 @@ class TwoTower(nn.Module):
                  hidden_layers: List[int],
                  last_linear: bool,
                  query_text_feature: str,
-                 product_text_feature: str):
+                 document_text_feature: str):
         super(TwoTower, self).__init__()
 
         self.text_embedding = nn.EmbeddingBag(
@@ -86,20 +86,20 @@ class TwoTower(nn.Module):
                  last_linear=last_linear)
         )
 
-        self.product_tower = nn.Sequential(
+        self.document_tower = nn.Sequential(
             self.text_embedding,
             _mlp(input_dim=text_embedding_dim, output_dim=output_dim, hidden_layers=hidden_layers,
                  last_linear=last_linear)
         )
 
         self.query_text_feature = query_text_feature
-        self.product_text_feature = product_text_feature
+        self.document_text_feature = document_text_feature
 
     def forward_query(self, text: torch.Tensor) -> torch.Tensor:
         return self.query_tower(text)
 
-    def forward_product(self, text: torch.Tensor) -> torch.Tensor:
-        return self.product_tower(text)
+    def forward_document(self, text: torch.Tensor) -> torch.Tensor:
+        return self.document_tower(text)
 
 
 def _mlp(input_dim: int, output_dim: int, hidden_layers: List[int], last_linear: bool) -> nn.Module:
@@ -132,13 +132,13 @@ class MultiModalTwoTower(nn.Module):
                  last_linear: bool,
                  output_dim: int,
                  query_text_feature: str,
-                 product_text_feature: str,
-                 product_categorical_feature: str
+                 document_text_feature: str,
+                 document_categorical_feature: str
                  ):
         super(MultiModalTwoTower, self).__init__()
         self.query_text_feature = query_text_feature
-        self.product_text_feature = product_text_feature
-        self.product_categorical_feature = product_categorical_feature
+        self.document_text_feature = document_text_feature
+        self.document_categorical_feature = document_categorical_feature
 
         self.text_embedding = nn.EmbeddingBag(
             num_embeddings=num_embeddings,
@@ -158,17 +158,17 @@ class MultiModalTwoTower(nn.Module):
             embedding_dim=category_embedding_dim
         )
 
-        self.product_mlp = _mlp(input_dim=text_embedding_dim + category_embedding_dim,
+        self.document_mlp = _mlp(input_dim=text_embedding_dim + category_embedding_dim,
                                 hidden_layers=hidden_layers,
                                 output_dim=output_dim, last_linear=last_linear)
 
     def forward_query(self, text: torch.Tensor) -> torch.Tensor:
         return self.query_tower(text)
 
-    def forward_product(self, text: torch.Tensor, category: torch.Tensor) -> torch.Tensor:
+    def forward_document(self, text: torch.Tensor, category: torch.Tensor) -> torch.Tensor:
         t = self.text_embedding(text)
         c = self.category_embedding(category)
 
         combined = torch.cat((t, c), 1)
 
-        return self.product_mlp(combined)
+        return self.document_mlp(combined)
