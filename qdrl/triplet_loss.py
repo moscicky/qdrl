@@ -7,6 +7,7 @@ import torch.nn.functional as F
 from qdrl.batch_predictor import predict
 from qdrl.loss_computer import LossComputer
 
+# https://github.com/adambielski/siamese-triplet
 class BatchNegativeTripletsAssembler:
     def __init__(self, batch_size: int, negatives_count: int):
         self.anchor_mask, self.positive_mask, self.negative_mask = self.batch_negative_triplets_mask(batch_size,
