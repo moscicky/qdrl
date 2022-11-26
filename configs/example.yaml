@@ -1,8 +1,8 @@
 task_id: "local_runs"
-run_id: "batch_softmax_temperature_01"
-num_epochs: 2
-dataset_dir: "datasets/local_parquet"
-commit_hash: "whatever"
+run_id: "example_config"
+num_epochs: 5
+dataset_dir: "datasets/local"
+commit_hash: "abc"
 batch_size: 64
 learning_rate: 1e-2
 reuse_epoch: True
@@ -14,6 +14,10 @@ dataset:
   document_features:
     - name: "document_name"
       type: "text"
+    - name: "product_category_id"
+      type: "categorical"
+      dictionary_path: "datasets/local/categories"
+      num_oov_categories: 23
 loss:
   type: batch_softmax
   batch_size: 64
@@ -22,16 +26,19 @@ negatives:
   type: batch
 text_vectorizer:
   type: dictionary
-  dictionary_path: datasets/local_parquet/token_dictionary_150000_0_0
+  dictionary_path: "datasets/local/token_dictionary_150000_0_0"
   word_unigrams_limit: 10
   word_bigrams_limit: 0
   char_trigrams_limit: 0
   num_oov_tokens: 50000
 model:
-  type: TwoTower
+  type: MultiModalTwoTower
   text_embedding:
     num_embeddings: 200000
     embedding_dim: 256
+  category_feature:
+    num_embeddings: 23000
+    embedding_dim: 32
   hidden_layers:
     - 128
   last_linear: True
@@ -40,6 +47,7 @@ model:
     text_feature: "query_search_phrase"
   document:
     text_feature: "document_name"
+    categorical_feature: "document_category_id"
 recall_validation:
   enabled: False
   k:
@@ -49,3 +57,4 @@ recall_validation:
     - 1024
   query_typo_probabilities:
     - 0.0
+    - 0.5
